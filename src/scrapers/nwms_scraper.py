@@ -25,6 +25,7 @@ NWMS 发料明细爬虫 - 内网 NWMS 仓储系统
   python3 src/scrapers/nwms_scraper.py --status COMPLETED
 """
 
+import os
 import requests
 import json
 import csv
@@ -32,10 +33,10 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-# ─── 配置区（NWMS Token 过期后只需更新这里）───────────────────────────────────
+# ─── 配置区（优先读环境变量，回退到硬编码值）────────────────────────────────
 NWMS_CONFIG = {
     "base_url": "http://10.80.35.11:8080/nwms/v1/9",
-    "token": "e5d87dcf-83fa-4bec-aa3d-c8d3d5b56c7b",  # ← 过期后替换
+    "token": os.environ.get("NWMS_TOKEN", "e5d87dcf-83fa-4bec-aa3d-c8d3d5b56c7b"),
     "site_id": "2.1",
     "frontend_url": "http://10.80.35.11:91",
     "page_size": 200,  # 每页条数

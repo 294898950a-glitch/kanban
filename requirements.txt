@@ -1,0 +1,7 @@
+requests
+requests_ntlm
+fastapi
+uvicorn
+APScheduler
+SQLAlchemy
+pydantic
