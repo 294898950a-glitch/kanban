@@ -157,7 +157,6 @@ def get_alerts_top10():
             .where(AlertReportSnapshot.is_legacy == 0)
             .where(AlertReportSnapshot.order_status.in_(COMPLETED_STATUSES))
             .order_by(desc(AlertReportSnapshot.actual_inventory))
-            .limit(10)
         ).scalars().all()
 
         return [
@@ -193,7 +192,6 @@ def get_issues_top5():
             .where(IssueAuditSnapshot.batch_id == latest_kpi.batch_id)
             .where(IssueAuditSnapshot.over_issue_qty > 0.01)
             .order_by(desc(IssueAuditSnapshot.over_issue_qty))
-            .limit(5)
         ).scalars().all()
 
         return [

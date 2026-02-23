@@ -103,28 +103,28 @@ def run_tests():
         )
         if latest_batch:
             bid = latest_batch[0]["batch_id"]
-            # Phase3: 按 actual_inventory DESC，完工 + 非历史遗留，最多10条
-            db_top10 = db_query(
+            # 全量：完工 + 非历史遗留，按 actual_inventory DESC
+            db_alerts = db_query(
                 "SELECT * FROM alert_report_snapshots WHERE batch_id=? AND is_legacy=0 "
                 "AND order_status IN ('Completado','完成','Completed','已完成','Se ha iniciado la construcción') "
-                "ORDER BY actual_inventory DESC LIMIT 10",
+                "ORDER BY actual_inventory DESC",
                 (bid,)
             )
             results.append(check(
-                "Top10 条目数一致",
-                len(api_alerts) == len(db_top10),
-                f"API={len(api_alerts)}条  DB={len(db_top10)}条"
+                "退料预警全量一致",
+                len(api_alerts) == len(db_alerts),
+                f"API={len(api_alerts)}条  DB={len(db_alerts)}条"
             ))
-            if api_alerts and db_top10:
+            if api_alerts and db_alerts:
                 results.append(check(
                     "Top1 工单号一致",
-                    api_alerts[0]["shop_order"] == db_top10[0]["shop_order"],
-                    f"API={api_alerts[0]['shop_order']}  DB={db_top10[0]['shop_order']}"
+                    api_alerts[0]["shop_order"] == db_alerts[0]["shop_order"],
+                    f"API={api_alerts[0]['shop_order']}  DB={db_alerts[0]['shop_order']}"
                 ))
                 results.append(check(
                     "Top1 实际库存量一致",
-                    abs(float(api_alerts[0]["actual_inventory"]) - float(db_top10[0]["actual_inventory"])) < 0.01,
-                    f"API={api_alerts[0]['actual_inventory']}  DB={db_top10[0]['actual_inventory']}"
+                    abs(float(api_alerts[0]["actual_inventory"]) - float(db_alerts[0]["actual_inventory"])) < 0.01,
+                    f"API={api_alerts[0]['actual_inventory']}  DB={db_alerts[0]['actual_inventory']}"
                 ))
 
     # ── 3. Issues Top5 ──
