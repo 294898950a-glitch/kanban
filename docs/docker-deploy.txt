@@ -79,7 +79,7 @@ git pull && docker compose up -d --build
 cp -r ./data ./data_backup_$(date +%Y%m%d)
 
 # SQLite 数据库位置
-./data/lmt_kanban.db
+./data/matetial_monitor.db
 
 ==============================================================
 六、调度任务说明
