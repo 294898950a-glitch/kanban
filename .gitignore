@@ -11,3 +11,4 @@ src/scrapers/nwms_debug.py
 src/scrapers/nwms_explorer.py
 restructure_readme.py
 .vscode/
+docs/docker-deploy.txt
