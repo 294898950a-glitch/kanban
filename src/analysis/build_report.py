@@ -151,6 +151,7 @@ def load_nwms_lines():
             "productionLine": r.get("_productionLine", ""),
             "warehouse": r.get("_wareHouse", ""),
             "docStatus": r.get("_docStatus", ""),
+            "ppStartTime": r.get("_ppStartTime", ""),
         })
 
     print(f"  NWMS 发料行: {sum(len(v) for v in by_component.values())} 条，"
@@ -297,7 +298,7 @@ def build_issue_audit(nwms_by_component, orders, bom_index):
                 "产线": ln["productionLine"],
                 "仓库": ln["warehouse"],
                 "IMES工单状态": matched_order.get("statusDesc", "") if matched_order else "",
-                "计划发料日期": ln.get("_ppStartTime", ""),
+                "计划发料日期": ln.get("ppStartTime", ""),
             })
 
     # 按超发量降序排列（最严重的排前面）
