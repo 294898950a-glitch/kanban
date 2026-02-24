@@ -21,6 +21,7 @@ import io
 from pathlib import Path
 from datetime import datetime
 from collections import defaultdict
+from src.config.common_materials import COMMON_MATERIALS
 
 BASE = Path(__file__).parent.parent.parent / "data" / "raw"
 
@@ -458,6 +459,10 @@ def run():
         if not r.get("is_legacy")
         and r.get("工单号") in orders
     ]
+    confirmed_alerts_excl = [
+        r for r in confirmed_alerts
+        if r.get("物料编号", "") not in COMMON_MATERIALS
+    ]
     unmatched_current = [
         (wo, mat) for (wo, mat), inv in inventory.items()
         if not _is_legacy(inv["receive_time"])
@@ -516,6 +521,7 @@ def run():
         "nwms_lines_matched": nwms_matched if nwms_lines else 0,
         "nwms_match_rate": round(nwms_matched / nwms_total * 100, 1) if nwms_lines and nwms_total > 0 else 0.0,
         "confirmed_alert_count": len(confirmed_alerts),
+        "confirmed_alert_count_excl": len(confirmed_alerts_excl),
         "unmatched_current_count": len(unmatched_current),
         "legacy_count": len(legacy_items),
         "avg_aging_hours_current": avg_aging_current,
