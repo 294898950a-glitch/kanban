@@ -311,8 +311,8 @@ function IssueTable({ rows, sort, onSort }: { rows: IssueRow[]; sort: IssueSort;
                         <tr key={i} className="border-b border-gray-800 hover:bg-gray-800/50 transition-colors">
                             <td className="px-4 py-3 font-medium text-white">{r.demand_list_number}</td>
                             <td className="px-4 py-3">{r.material_code}</td>
-                            <td className="px-4 py-3">{r.related_wo || '-'}</td>
-                            <td className="px-4 py-3">{r.production_line || '-'}</td>
+                            <td className="px-4 py-3 whitespace-nowrap">{r.related_wo || '-'}</td>
+                            <td className="px-4 py-3 whitespace-nowrap">{r.production_line || '-'}</td>
                             <td className="px-4 py-3 text-gray-500">{r.plan_issue_date || '-'}</td>
                             <td className="px-4 py-3">{r.bom_demand_qty > 0 ? r.bom_demand_qty.toFixed(2) : '-'}</td>
                             <td className="px-4 py-3">{r.demand_qty?.toFixed(2)}</td>
