@@ -49,14 +49,23 @@ export default function MetricsDoc() {
                 <h3 className="text-sm font-medium text-gray-300 mb-2">触发条件</h3>
                 <FormulaBox>2026 年工单  ×  已完工  ×  线边仓仍有库存  →  退料预警</FormulaBox>
 
+                <div className="mt-4 p-3 bg-gray-800 rounded-lg border border-gray-700">
+                    <p className="text-xs text-gray-400">
+                        <span className="text-yellow-400 font-medium">通用物料 Toggle：</span>
+                        部分物料（辅料、共用件等）会跨工单共享，长期留存属正常现象。
+                        页面右上角可切换「含通用物料 / 已剔除通用物料」两种口径，
+                        剔除后的数字更能反映真实积压风险。通用物料白名单由管理员维护。
+                    </p>
+                </div>
+
                 <div className="mt-4">
                     <h3 className="text-sm font-medium text-gray-300 mb-2">KPI 卡片说明</h3>
                     <MetricTable rows={[
-                        ['当期退料预警', '分析计算', '匹配 2026 年工单 + 已完工 + 线边仓仍有库存，需立即退料处理'],
+                        ['当期退料预警', '分析计算', '匹配 2026 年工单 + 已完工 + 线边仓仍有库存，需立即退料处理；受通用物料 Toggle 影响'],
                         ['工单范围外库存', '分析计算', '接收时间≥2026 但关联工单不在 IMES 监控窗口，需人工核查归属'],
                         ['历史遗留库存', '分析计算', '接收时间<2026 或无记录的线边仓库存组合数（工单+物料），不计入预警但保留展示'],
                         ['进场：超发预警', '分析计算', 'NWMS 实际发料量超出计划发料量的行数，跨备料单汇总'],
-                        ['当期平均库龄', '分析计算', '仅统计当期退料预警物料的平均滞留时长（小时）'],
+                        ['当期平均库龄', '分析计算', '仅统计当期退料预警物料的平均滞留时长（小时）；受通用物料 Toggle 影响'],
                     ]} />
                 </div>
 
@@ -152,18 +161,18 @@ export default function MetricsDoc() {
                     <tbody className="text-gray-300">
                         <tr className="border-b border-gray-800">
                             <td className="py-2 pr-4 font-medium text-white">IMES</td>
-                            <td className="py-2 pr-4">工单状态（每小时）、BOM 明细（凌晨）</td>
-                            <td className="py-2 text-green-400">全天整点 / 凌晨 2 点</td>
+                            <td className="py-2 pr-4">工单状态（每次同步）、BOM 明细（每日晨间）</td>
+                            <td className="py-2 text-green-400">06 / 10 / 14 / 18 / 22 CST</td>
                         </tr>
                         <tr className="border-b border-gray-800">
                             <td className="py-2 pr-4 font-medium text-white">SSRS</td>
                             <td className="py-2 pr-4">线边仓库存（条码级）</td>
-                            <td className="py-2 text-green-400">全天整点</td>
+                            <td className="py-2 text-green-400">06 / 10 / 14 / 18 / 22 CST</td>
                         </tr>
                         <tr>
                             <td className="py-2 pr-4 font-medium text-white">NWMS</td>
                             <td className="py-2 pr-4">备料单发料明细（2026年起）</td>
-                            <td className="py-2 text-green-400">全天整点 / 凌晨 2 点</td>
+                            <td className="py-2 text-green-400">06 / 10 / 14 / 18 / 22 CST</td>
                         </tr>
                     </tbody>
                 </table>
