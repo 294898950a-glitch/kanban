@@ -51,7 +51,7 @@ def get_kpi_summary(exclude_common: bool = False):
             "alert_group_count": latest_kpi.alert_group_count,
             "high_risk_count": latest_kpi.high_risk_count,
             "over_issue_lines": latest_kpi.over_issue_lines,
-            "avg_aging_hours": latest_kpi.avg_aging_hours,
+            "avg_aging_hours": (latest_kpi.avg_aging_hours_excl or 0.0) if exclude_common else (latest_kpi.avg_aging_hours or 0.0),
             "confirmed_alert_count": (latest_kpi.confirmed_alert_count_excl or 0) if exclude_common else (latest_kpi.confirmed_alert_count or 0),
             "unmatched_current_count": latest_kpi.unmatched_current_count or 0,
             "legacy_count": latest_kpi.legacy_count or 0,
@@ -78,7 +78,7 @@ def get_kpi_trend(limit: int = 14, exclude_common: bool = False):
                 "high_risk_count": h.high_risk_count,
                 "confirmed_alert_count": (h.confirmed_alert_count_excl or 0) if exclude_common else (h.confirmed_alert_count or 0),
                 "over_issue_lines": h.over_issue_lines,
-                "avg_aging_hours": h.avg_aging_hours or 0.0,
+                "avg_aging_hours": (h.avg_aging_hours_excl or 0.0) if exclude_common else (h.avg_aging_hours or 0.0),
             }
             for h in history
         ]
@@ -86,7 +86,7 @@ def get_kpi_trend(limit: int = 14, exclude_common: bool = False):
         db.close()
 
 @app.get("/api/kpi/aging-distribution")
-def get_aging_distribution():
+def get_aging_distribution(exclude_common: bool = False):
     """返回最新批次当期已核实物料的库龄分布"""
     db = SessionLocal()
     try:
@@ -98,11 +98,14 @@ def get_aging_distribution():
 
         from datetime import datetime as dt
         now = dt.utcnow()
-        rows = db.execute(
-            select(AlertReportSnapshot)
-            .where(AlertReportSnapshot.batch_id == latest.batch_id)
+        stmt = select(AlertReportSnapshot) \
+            .where(AlertReportSnapshot.batch_id == latest.batch_id) \
             .where(AlertReportSnapshot.is_legacy == 0)
-        ).scalars().all()
+        
+        if exclude_common:
+            stmt = stmt.where(AlertReportSnapshot.material_code.not_in(list(COMMON_MATERIALS)))
+            
+        rows = db.execute(stmt).scalars().all()
 
         dist = {"le1": 0, "d1_3": 0, "d3_7": 0, "d7_14": 0, "d14_30": 0, "gt30": 0}
         for r in rows:
