@@ -6,6 +6,7 @@ from typing import List, Optional
 from datetime import datetime
 import json
 
+from src.config.common_materials import COMMON_MATERIALS
 from src.db.database import get_db, SessionLocal
 from src.db.models import KPIHistory, AlertReportSnapshot, IssueAuditSnapshot, DataQualitySnapshot
 from src.api.scheduler import start_scheduler
@@ -32,7 +33,7 @@ app.add_middleware(
 )
 
 @app.get("/api/kpi/summary")
-def get_kpi_summary():
+def get_kpi_summary(exclude_common: bool = False):
     """获取最新批次的全局 KPI 汇总"""
     db = SessionLocal()
     try:
@@ -51,7 +52,7 @@ def get_kpi_summary():
             "high_risk_count": latest_kpi.high_risk_count,
             "over_issue_lines": latest_kpi.over_issue_lines,
             "avg_aging_hours": latest_kpi.avg_aging_hours,
-            "confirmed_alert_count": latest_kpi.confirmed_alert_count or 0,
+            "confirmed_alert_count": (latest_kpi.confirmed_alert_count_excl or 0) if exclude_common else (latest_kpi.confirmed_alert_count or 0),
             "unmatched_current_count": latest_kpi.unmatched_current_count or 0,
             "legacy_count": latest_kpi.legacy_count or 0,
         }
@@ -59,7 +60,7 @@ def get_kpi_summary():
         db.close()
 
 @app.get("/api/kpi/trend")
-def get_kpi_trend(limit: int = 14):
+def get_kpi_trend(limit: int = 14, exclude_common: bool = False):
     """获取最近若干次的 KPI 趋势，用于绘制折线图"""
     db = SessionLocal()
     try:
@@ -75,7 +76,7 @@ def get_kpi_trend(limit: int = 14):
                 "timestamp": h.timestamp.strftime("%m-%d %H:%M"),
                 "alert_group_count": h.alert_group_count,
                 "high_risk_count": h.high_risk_count,
-                "confirmed_alert_count": h.confirmed_alert_count or 0,
+                "confirmed_alert_count": (h.confirmed_alert_count_excl or 0) if exclude_common else (h.confirmed_alert_count or 0),
                 "over_issue_lines": h.over_issue_lines,
                 "avg_aging_hours": h.avg_aging_hours or 0.0,
             }
@@ -129,7 +130,7 @@ def get_aging_distribution():
 COMPLETED_STATUSES = {'Completado', '完成', 'Completed', '已完成', 'Se ha iniciado la construcción'}
 
 @app.get("/api/alerts/top10")
-def get_alerts_top10():
+def get_alerts_top10(exclude_common: bool = False):
     """当期退料预警：已完工且仍有库存，按实际库存量排序"""
     db = SessionLocal()
     try:
@@ -151,13 +152,14 @@ def get_alerts_top10():
             except Exception:
                 return -1.0
 
-        rows = db.execute(
-            select(AlertReportSnapshot)
-            .where(AlertReportSnapshot.batch_id == latest_kpi.batch_id)
-            .where(AlertReportSnapshot.is_legacy == 0)
+        stmt = select(AlertReportSnapshot) \
+            .where(AlertReportSnapshot.batch_id == latest_kpi.batch_id) \
+            .where(AlertReportSnapshot.is_legacy == 0) \
             .where(AlertReportSnapshot.order_status.in_(COMPLETED_STATUSES))
-            .order_by(desc(AlertReportSnapshot.actual_inventory))
-        ).scalars().all()
+        if exclude_common:
+            stmt = stmt.where(AlertReportSnapshot.material_code.not_in(list(COMMON_MATERIALS)))
+        stmt = stmt.order_by(desc(AlertReportSnapshot.actual_inventory))
+        rows = db.execute(stmt).scalars().all()
 
         return [
             {
@@ -226,7 +228,7 @@ def get_batches():
         db.close()
 
 @app.get("/api/alerts/list")
-def get_alerts_list(batch_id: str = "", q: str = ""):
+def get_alerts_list(batch_id: str = "", q: str = "", exclude_common: bool = False):
     """离场审计完整明细，支持关键字过滤（工单号或物料编号）"""
     db = SessionLocal()
     try:
@@ -246,6 +248,8 @@ def get_alerts_list(batch_id: str = "", q: str = ""):
                 AlertReportSnapshot.material_code.contains(q) |
                 AlertReportSnapshot.barcode_list.contains(q)
             )
+        if exclude_common:
+            stmt = stmt.where(AlertReportSnapshot.material_code.not_in(list(COMMON_MATERIALS)))
         stmt = stmt.order_by(desc(AlertReportSnapshot.deviation))
         rows = db.execute(stmt).scalars().all()
 
