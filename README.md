@@ -633,7 +633,7 @@ A: 执行 `sudo apt install docker-compose-plugin` 安装。
 
 | 类别 | 内容 | 状态 |
 |------|------|------|
-| src/config/common_materials.py | 通用物料白名单（6 个物料编号），集中管理 | ✅ |
+| src/config/common_materials.py | 通用物料白名单（8 个物料编号），集中管理 | ✅ |
 | kpi_history 模型/DB | 新增 confirmed_alert_count_excl / avg_aging_hours_excl 列，同步时预算 | ✅ |
 | build_report.py | 剔除白名单后计算退料预警数和平均库龄，写入 quality_stats | ✅ |
 | sync.py | 持久化两个剔除后字段；每次同步后自动清理 30 天前数据 | ✅ |
