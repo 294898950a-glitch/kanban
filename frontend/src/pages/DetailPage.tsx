@@ -309,17 +309,17 @@ function IssueTable({ rows, sort, onSort }: { rows: IssueRow[]; sort: IssueSort;
                 <tbody>
                     {rows.map((r, i) => (
                         <tr key={i} className="border-b border-gray-800 hover:bg-gray-800/50 transition-colors">
-                            <td className="px-4 py-3 font-medium text-white">{r.demand_list_number}</td>
-                            <td className="px-4 py-3">{r.material_code}</td>
-                            <td className="px-4 py-3 whitespace-nowrap">{r.related_wo || '-'}</td>
-                            <td className="px-4 py-3 whitespace-nowrap">{r.production_line || '-'}</td>
-                            <td className="px-4 py-3 text-gray-500">{r.plan_issue_date || '-'}</td>
-                            <td className="px-4 py-3">{r.bom_demand_qty > 0 ? r.bom_demand_qty.toFixed(2) : '-'}</td>
-                            <td className="px-4 py-3">{r.demand_qty?.toFixed(2)}</td>
-                            <td className="px-4 py-3">{r.actual_qty?.toFixed(2)}</td>
-                            <td className="px-4 py-3"><DeviationBadge value={r.over_issue_qty ?? 0} /></td>
-                            <td className="px-4 py-3 text-yellow-400">{fmtRate(r.over_issue_rate)}</td>
-                            <td className="px-4 py-3 text-orange-400">{fmtRate(r.over_vs_bom_rate)}</td>
+                            <td className="px-4 py-3 truncate font-medium text-white" title={r.demand_list_number}>{r.demand_list_number}</td>
+                            <td className="px-4 py-3 truncate" title={r.material_code}>{r.material_code}</td>
+                            <td className="px-4 py-3 truncate" title={r.related_wo}>{r.related_wo || '-'}</td>
+                            <td className="px-4 py-3 truncate" title={r.production_line}>{r.production_line || '-'}</td>
+                            <td className="px-4 py-3 truncate text-gray-500">{r.plan_issue_date || '-'}</td>
+                            <td className="px-4 py-3 text-right">{r.bom_demand_qty > 0 ? r.bom_demand_qty.toFixed(2) : '-'}</td>
+                            <td className="px-4 py-3 text-right">{r.demand_qty?.toFixed(2)}</td>
+                            <td className="px-4 py-3 text-right">{r.actual_qty?.toFixed(2)}</td>
+                            <td className="px-4 py-3 text-right"><DeviationBadge value={r.over_issue_qty ?? 0} /></td>
+                            <td className="px-4 py-3 text-right text-yellow-400">{fmtRate(r.over_issue_rate)}</td>
+                            <td className="px-4 py-3 text-right text-orange-400">{fmtRate(r.over_vs_bom_rate)}</td>
                         </tr>
                     ))}
                 </tbody>
