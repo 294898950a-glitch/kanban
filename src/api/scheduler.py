@@ -53,16 +53,17 @@ def run_nwms_full_sync():
 scheduler = BackgroundScheduler(timezone="Asia/Shanghai")
 
 def start_scheduler():
-    # 每天早 6 点到晚 22 点，每小时触发一次轻量级同步
+    # 每小时整点同步（全天，覆盖中国+墨西哥双时区工作时段）
+    # TZ=Asia/Shanghai 已设置，hour 按 CST 解释
     scheduler.add_job(
         run_inventory_and_orders,
-        trigger=CronTrigger(hour="6-22", minute=0),
+        trigger=CronTrigger(minute=0),   # 每小时，不限时段
         id="hourly_sync",
         name="每小时库存状态同步",
         replace_existing=True
     )
-    
-    # 每天凌晨 2 点触发深度 NWMS 全量抓取
+
+    # 每天 02:00 CST（墨西哥时间 12:00 前一天）触发深度 NWMS 全量抓取
     scheduler.add_job(
         run_nwms_full_sync,
         trigger=CronTrigger(hour=2, minute=0),
