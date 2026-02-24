@@ -229,7 +229,10 @@ function Dashboard() {
             return (60 - min) * 60_000 - sec * 1000 - ms
         }
 
-        // 到下一个墨西哥整点触发，之后每小时整点循环
+        // 每 5 分钟轮询一次，确保新批次数据最多 5 分钟内自动显示
+        const pollInterval = setInterval(fetchData, 5 * 60_000)
+
+        // 同时保留蒙特雷整点对齐（不影响轮询）
         let hourlyInterval: ReturnType<typeof setInterval>
         const timeout = setTimeout(() => {
             fetchData()
@@ -244,6 +247,7 @@ function Dashboard() {
         window.addEventListener('resize', handleResize)
 
         return () => {
+            clearInterval(pollInterval)
             clearTimeout(timeout)
             clearInterval(hourlyInterval)
             window.removeEventListener('resize', handleResize)
