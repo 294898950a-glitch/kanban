@@ -504,12 +504,12 @@ BOM口径超发量  = actualQuantity - BOM.sumQty（更客观，不受备料员�
 
 调度器随 API 容器启动（APScheduler，`Asia/Shanghai` 时区）。调度器直接 import 爬虫 `run()` 函数调用，无 subprocess，无 PYTHONPATH 问题：
 
-| 任务 | 时间 | 内容 | 耗时 |
-|------|------|------|------|
-| 整点同步 | 每小时整点（全天24小时） | 库存(SSRS) + 工单(IMES, `--start 2026-01-01`) + NWMS(`--start 2026-01-01`) + 分析 + 写DB | ~8 分钟 |
-| 深夜全量 | 每日 02:00 CST | BOM(IMES) + NWMS + 分析 + 写DB | ~15 分钟 |
+| 任务 | 时间（CST） | 内容 | 耗时 |
+|------|------------|------|------|
+| 晨间全量 | 06:00 | BOM(IMES) + 库存(SSRS) + 工单(IMES) + NWMS + 分析 + 写DB | ~15 分钟 |
+| 4小时同步 | 10 / 14 / 18 / 22 | 库存(SSRS) + 工单(IMES) + NWMS + 分析 + 写DB | ~8 分钟 |
 
-**批次机制**：每次同步生成新 `batch_id`（时间戳），数据追加写入，旧批次保留用于趋势图。数据库无自动清理，长期运行会增长。
+**批次机制**：每次同步生成新 `batch_id`（时间戳），数据追加写入，旧批次保留用于趋势图。每次同步后自动清理 30 天前数据（`purge_old_batches`）。
 
 ---
 
@@ -629,14 +629,16 @@ A: 执行 `sudo apt install docker-compose-plugin` 安装。
 | scheduler.py | 改用直接 import 调用爬虫 run()，彻底消除 PYTHONPATH 问题 | ✅ |
 | bom_scraper.py | 内部引用改为绝对包路径（from src.scrapers.xxx） | ✅ |
 
-### Phase 7（2026-02-25）— 通用物料剔除 Toggle
+### Phase 7（2026-02-25）— 通用物料剔除 Toggle + 调度优化
 
 | 类别 | 内容 | 状态 |
 |------|------|------|
 | src/config/common_materials.py | 通用物料白名单（6 个物料编号），集中管理 | ✅ |
 | kpi_history 模型/DB | 新增 confirmed_alert_count_excl / avg_aging_hours_excl 列，同步时预算 | ✅ |
 | build_report.py | 剔除白名单后计算退料预警数和平均库龄，写入 quality_stats | ✅ |
-| sync.py | 持久化两个剔除后字段到 kpi_history | ✅ |
+| sync.py | 持久化两个剔除后字段；每次同步后自动清理 30 天前数据 | ✅ |
 | main.py | 5 个离场接口支持 exclude_common 参数（summary/trend/aging-distribution/top10/list） | ✅ |
 | Dashboard.tsx | 离场审计区域加 Toggle，联动 KPI / 列表 / 趋势图 / 库龄分布 | ✅ |
 | DetailPage.tsx | 离场 Tab 加独立 Toggle，进场审计不受影响 | ✅ |
+| scheduler.py | 调度改为 06/10/14/18/22 CST（每天 5 次），06:00 晨间含 BOM 全量 | ✅ |
+| MetricsDoc.tsx | 补充通用物料 Toggle 说明、更新同步频率展示 | ✅ |
