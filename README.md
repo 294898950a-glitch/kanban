@@ -502,7 +502,7 @@ BOM口径超发量  = actualQuantity - BOM.sumQty（更客观，不受备料员�
 
 ## 12. 调度策略
 
-调度器随 API 容器启动（APScheduler，`Asia/Shanghai` 时区）：
+调度器随 API 容器启动（APScheduler，`Asia/Shanghai` 时区）。调度器直接 import 爬虫 `run()` 函数调用，无 subprocess，无 PYTHONPATH 问题：
 
 | 任务 | 时间 | 内容 | 耗时 |
 |------|------|------|------|
@@ -618,7 +618,7 @@ A: 执行 `sudo apt install docker-compose-plugin` 安装。
 | 爬虫 env 支持 | 三个爬虫读取环境变量（硬编码回退） | ✅ |
 | 运维文档 | docs/docker-deploy.txt（完整部署操作手册） | ✅ |
 
-### Phase 6（2026-02-24）— Token 自动刷新
+### Phase 6（2026-02-24）— Token 自动刷新 + 调度器重构
 
 | 类别 | 内容 | 状态 |
 |------|------|------|
@@ -626,3 +626,5 @@ A: 执行 `sudo apt install docker-compose-plugin` 安装。
 | shop_order_scraper.py | 401 触发自动刷新 IMES Token，写回 .env，重试请求 | ✅ |
 | nwms_scraper.py | 401 触发自动刷新 NWMS Token，写回 .env，重试请求 | ✅ |
 | .env | 新增 HZERO_USERNAME / HZERO_PASSWORD 凭据 | ✅ |
+| scheduler.py | 改用直接 import 调用爬虫 run()，彻底消除 PYTHONPATH 问题 | ✅ |
+| bom_scraper.py | 内部引用改为绝对包路径（from src.scrapers.xxx） | ✅ |

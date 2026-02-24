@@ -203,15 +203,28 @@ def save_csv(rows: list[dict], filename: str) -> Path:
 
 ## 8. 调度器注册新爬虫（scheduler.py）
 
+scheduler 直接 import 并调用爬虫的 `run()` 函数，**不使用 subprocess**，无需关心 PYTHONPATH：
+
 ```python
-# 整点任务 — 加入新爬虫脚本
-HOURLY_SCRIPTS = [
-    ("inventory",   ["python3", "src/scrapers/inventory_scraper.py"]),
-    ("shop_order",  ["python3", "src/scrapers/shop_order_scraper.py", "--start", "2026-01-01 00:00:00"]),
-    ("nwms",        ["python3", "src/scrapers/nwms_scraper.py", "--start", "2026-01-01"]),
-    ("your_new",    ["python3", "src/scrapers/your_new_scraper.py"]),  # 新增这行
-]
+# 在 scheduler.py 顶部加 import
+from src.scrapers.your_new_scraper import run as run_your_new
+
+# 在对应任务函数里调用
+def run_inventory_and_orders():
+    run_inventory()
+    run_shop_order(start_date="2026-01-01 00:00:00")
+    run_nwms(start_date="2026-01-01")
+    run_your_new()          # 新增这行
+    run_and_sync()
 ```
+
+> ⚠️ 爬虫内部互相引用时必须用**绝对包路径**：
+> ```python
+> # 正确 ✓
+> from src.scrapers.shop_order_scraper import CONFIG, HEADERS
+> # 错误 ✗（只在脚本直接运行时有效）
+> from shop_order_scraper import CONFIG, HEADERS
+> ```
 
 ---
 
