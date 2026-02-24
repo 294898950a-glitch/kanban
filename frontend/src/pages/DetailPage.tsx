@@ -74,6 +74,7 @@ export default function DetailPage() {
     const [issueChip, setIssueChip] = useState<'all' | 'over' | 'under'>('all')
     const [issueSort, setIssueSort] = useState<{ key: keyof IssueRow; dir: 1 | -1 }>({ key: 'over_issue_qty', dir: -1 })
     const [loading, setLoading] = useState(false)
+    const [excludeCommon, setExcludeCommon] = useState(false)
 
     // 加载批次列表
     useEffect(() => {
@@ -87,7 +88,7 @@ export default function DetailPage() {
     useEffect(() => {
         if (!batchId) return
         setLoading(true)
-        const params = { batch_id: batchId, q: query }
+        const params = { batch_id: batchId, q: query, exclude_common: excludeCommon }
         Promise.all([
             axios.get<AlertRow[]>('/api/alerts/list', { params }),
             axios.get<IssueRow[]>('/api/issues/list', { params }),
@@ -95,7 +96,7 @@ export default function DetailPage() {
             setAlertRows(a.data)
             setIssueRows(i.data)
         }).finally(() => setLoading(false))
-    }, [batchId, query])
+    }, [batchId, query, excludeCommon])
 
     // 初始化 URL 参数
     useEffect(() => {
@@ -167,8 +168,9 @@ export default function DetailPage() {
             </div>
 
             {/* Tab 切换 */}
-            <div className="flex gap-1 border-b border-gray-800">
-                {(['alert', 'issue'] as const).map(t => (
+            <div className="flex items-center justify-between border-b border-gray-800">
+                <div className="flex gap-1">
+                    {(['alert', 'issue'] as const).map(t => (
                     <button
                         key={t}
                         onClick={() => switchTab(t)}
@@ -180,6 +182,19 @@ export default function DetailPage() {
                         {t === 'alert' ? `离场审计（${alertRows.length}）` : `进场审计（${issueRows.length}）`}
                     </button>
                 ))}
+                </div>
+                {tab === 'alert' && (
+                    <button
+                        onClick={() => setExcludeCommon(v => !v)}
+                        className={`text-[10px] px-2 py-0.5 mb-1 mr-2 rounded-full border transition-colors ${
+                            excludeCommon
+                            ? 'bg-yellow-600 border-yellow-500 text-white'
+                            : 'bg-gray-700 border-gray-600 text-gray-300 hover:border-gray-400'
+                        }`}
+                    >
+                        {excludeCommon ? '已剔除通用物料' : '含通用物料'}
+                    </button>
+                )}
             </div>
 
             {/* 快捷筛选 Chips */}
