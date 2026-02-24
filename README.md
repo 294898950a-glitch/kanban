@@ -628,3 +628,15 @@ A: 执行 `sudo apt install docker-compose-plugin` 安装。
 | .env | 新增 HZERO_USERNAME / HZERO_PASSWORD 凭据 | ✅ |
 | scheduler.py | 改用直接 import 调用爬虫 run()，彻底消除 PYTHONPATH 问题 | ✅ |
 | bom_scraper.py | 内部引用改为绝对包路径（from src.scrapers.xxx） | ✅ |
+
+### Phase 7（2026-02-25）— 通用物料剔除 Toggle
+
+| 类别 | 内容 | 状态 |
+|------|------|------|
+| src/config/common_materials.py | 通用物料白名单（6 个物料编号），集中管理 | ✅ |
+| kpi_history 模型/DB | 新增 confirmed_alert_count_excl / avg_aging_hours_excl 列，同步时预算 | ✅ |
+| build_report.py | 剔除白名单后计算退料预警数和平均库龄，写入 quality_stats | ✅ |
+| sync.py | 持久化两个剔除后字段到 kpi_history | ✅ |
+| main.py | 5 个离场接口支持 exclude_common 参数（summary/trend/aging-distribution/top10/list） | ✅ |
+| Dashboard.tsx | 离场审计区域加 Toggle，联动 KPI / 列表 / 趋势图 / 库龄分布 | ✅ |
+| DetailPage.tsx | 离场 Tab 加独立 Toggle，进场审计不受影响 | ✅ |

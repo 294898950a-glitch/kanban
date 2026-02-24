@@ -72,6 +72,7 @@ export default function DetailPage() {
     const [issueRows, setIssueRows] = useState<IssueRow[]>([])
     const [alertChip, setAlertChip] = useState<'all' | 'le3' | 'd3_7' | 'd7_14' | 'gt14'>('all')
     const [issueChip, setIssueChip] = useState<'all' | 'over' | 'under'>('all')
+    const [alertSort, setAlertSort] = useState<{ key: keyof AlertRow; dir: 1 | -1 }>({ key: 'actual_inventory', dir: -1 })
     const [issueSort, setIssueSort] = useState<{ key: keyof IssueRow; dir: 1 | -1 }>({ key: 'over_issue_qty', dir: -1 })
     const [loading, setLoading] = useState(false)
     const [excludeCommon, setExcludeCommon] = useState(false)
@@ -115,15 +116,22 @@ export default function DetailPage() {
         else setIssueChip('all')
     }
 
-    const filteredAlerts = alertRows.filter(r => {
-        if (alertChip === 'all') return true
-        if (r.aging_days < 0) return false
-        if (alertChip === 'le3') return r.aging_days <= 3
-        if (alertChip === 'd3_7') return r.aging_days > 3 && r.aging_days <= 7
-        if (alertChip === 'd7_14') return r.aging_days > 7 && r.aging_days <= 14
-        if (alertChip === 'gt14') return r.aging_days > 14
-        return true
-    })
+    const filteredAlerts = (() => {
+        let rows = alertRows.filter(r => {
+            if (alertChip === 'all') return true
+            if (r.aging_days < 0) return false
+            if (alertChip === 'le3') return r.aging_days <= 3
+            if (alertChip === 'd3_7') return r.aging_days > 3 && r.aging_days <= 7
+            if (alertChip === 'd7_14') return r.aging_days > 7 && r.aging_days <= 14
+            if (alertChip === 'gt14') return r.aging_days > 14
+            return true
+        })
+        return [...rows].sort((a, b) => {
+            const av = a[alertSort.key] ?? 0
+            const bv = b[alertSort.key] ?? 0
+            return av < bv ? -alertSort.dir : av > bv ? alertSort.dir : 0
+        })
+    })()
 
     const filteredIssues = (() => {
         let rows = issueChip === 'over'
@@ -218,7 +226,7 @@ export default function DetailPage() {
 
             {/* 表格 */}
             {tab === 'alert' ? (
-                <AlertTable rows={filteredAlerts} />
+                <AlertTable rows={filteredAlerts} sort={alertSort} onSort={setAlertSort} />
             ) : (
                 <IssueTable rows={filteredIssues} sort={issueSort} onSort={setIssueSort} />
             )}
@@ -245,15 +253,43 @@ function Chip({ active, onClick, color = 'blue', children }: {
     )
 }
 
-function AlertTable({ rows }: { rows: AlertRow[] }) {
+type AlertSort = { key: keyof AlertRow; dir: 1 | -1 }
+
+function AlertTable({ rows, sort, onSort }: { rows: AlertRow[]; sort: AlertSort; onSort: (s: AlertSort) => void }) {
     if (rows.length === 0) return <Empty />
+
+    const cols: { label: string; key: keyof AlertRow | 'barcode_list'; width?: number }[] = [
+        { label: '工单号', key: 'shop_order' },
+        { label: '物料编号', key: 'material_code' },
+        { label: '物料描述', key: 'material_desc' },
+        { label: '线边仓', key: 'warehouse' },
+        { label: '实际库存', key: 'actual_inventory' },
+        { label: '单位', key: 'unit' },
+        { label: '库龄分析', key: 'aging_days' },
+        { label: '条码', key: 'barcode_list' },
+    ]
+
+    const handleSort = (key: any) => {
+        if (key === 'barcode_list') return;
+        onSort(sort.key === key ? { key, dir: (sort.dir * -1) as 1 | -1 } : { key, dir: -1 })
+    }
+
+    const arrow = (key: any) =>
+        sort.key === key ? (sort.dir === -1 ? ' ↓' : ' ↑') : ''
+
     return (
         <div className="overflow-x-auto rounded-lg border border-gray-800">
             <table className="w-full text-sm text-left text-gray-300">
                 <thead className="bg-gray-800 text-gray-400 text-xs uppercase">
                     <tr>
-                        {['工单号', '物料编号', '物料描述', '线边仓', '实际库存', '单位', '库龄分析', '条码'].map(h => (
-                            <th key={h} className="px-4 py-3 whitespace-nowrap">{h}</th>
+                        {cols.map(c => (
+                            <th
+                                key={c.label}
+                                className={`px-4 py-3 whitespace-nowrap ${c.key !== 'barcode_list' ? 'cursor-pointer hover:text-white select-none' : ''}`}
+                                onClick={() => handleSort(c.key)}
+                            >
+                                {c.label}{c.key !== 'barcode_list' ? arrow(c.key) : ''}
+                            </th>
                         ))}
                     </tr>
                 </thead>
