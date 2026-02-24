@@ -86,6 +86,7 @@ function Dashboard() {
     const trendChartRef = useRef<HTMLDivElement>(null)
     const agingChartRef = useRef<HTMLDivElement>(null)
     const [loading, setLoading] = useState(true)
+    const [excludeCommon, setExcludeCommon] = useState(false)
 
     // 退料预警排序
     const [alertSort, setAlertSort] = useState<{ key: 'actual_inventory' | 'aging_days', dir: 1 | -1 }>({ key: 'actual_inventory', dir: -1 })
@@ -97,10 +98,10 @@ function Dashboard() {
             setLoading(true)
             // 使用相对路径，由于 vite.config.ts 已经配置了代理 /api
             const [kpiRes, alertsRes, issuesRes, trendRes, agingRes] = await Promise.all([
-                axios.get<KPISummary>('/api/kpi/summary'),
-                axios.get<AlertTop[]>('/api/alerts/top10'),
+                axios.get<KPISummary>('/api/kpi/summary', { params: { exclude_common: excludeCommon } }),
+                axios.get<AlertTop[]>('/api/alerts/top10', { params: { exclude_common: excludeCommon } }),
                 axios.get<IssueTop[]>('/api/issues/top5'),
-                axios.get<KPITrend[]>('/api/kpi/trend'),
+                axios.get<KPITrend[]>('/api/kpi/trend', { params: { exclude_common: excludeCommon } }),
                 axios.get<AgingDistribution>('/api/kpi/aging-distribution')
             ])
 
@@ -252,7 +253,7 @@ function Dashboard() {
             clearInterval(hourlyInterval)
             window.removeEventListener('resize', handleResize)
         }
-    }, [])
+    }, [excludeCommon])
 
     const sortedAlerts = [...alerts].sort((a, b) =>
         ((a[alertSort.key] ?? 0) - (b[alertSort.key] ?? 0)) * alertSort.dir)
@@ -400,10 +401,22 @@ function Dashboard() {
                 {/* 左1/3：退料预警全量 */}
                 <div className="glass-panel p-6 flex flex-col h-[500px]">
                     <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-bold flex items-center text-red-400">
-                            <span className="w-2 h-6 bg-red-500 rounded mr-3"></span>
-                            退料预警（全量）
-                        </h3>
+                        <div className="flex items-center gap-3">
+                            <h3 className="text-lg font-bold flex items-center text-red-400">
+                                <span className="w-2 h-6 bg-red-500 rounded mr-3"></span>
+                                退料预警（全量）
+                            </h3>
+                            <button
+                                onClick={() => setExcludeCommon(v => !v)}
+                                className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
+                                    excludeCommon
+                                    ? 'bg-yellow-600 border-yellow-500 text-white'
+                                    : 'bg-gray-700 border-gray-600 text-gray-300 hover:border-gray-400'
+                                }`}
+                            >
+                                {excludeCommon ? '已剔除通用物料' : '含通用物料'}
+                            </button>
+                        </div>
                         <div className="flex gap-1 text-[10px]">
                             {(['actual_inventory', 'aging_days'] as const).map(k => (
                                 <button key={k} onClick={() => toggleAlertSort(k)}
