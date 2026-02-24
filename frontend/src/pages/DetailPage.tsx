@@ -288,7 +288,7 @@ function IssueTable({ rows, sort, onSort }: { rows: IssueRow[]; sort: IssueSort;
         sort.key === key ? (sort.dir === -1 ? ' ↓' : ' ↑') : ''
 
     const fmtRate = (v: number | null | undefined) =>
-        v == null ? '-' : `${(v * 100).toFixed(1)}%`
+        (v == null || v === 0) ? '-' : `${v.toFixed(1)}%`
 
     return (
         <div className="overflow-x-auto rounded-lg border border-gray-800">
@@ -314,7 +314,7 @@ function IssueTable({ rows, sort, onSort }: { rows: IssueRow[]; sort: IssueSort;
                             <td className="px-4 py-3">{r.related_wo || '-'}</td>
                             <td className="px-4 py-3">{r.production_line || '-'}</td>
                             <td className="px-4 py-3 text-gray-500">{r.plan_issue_date || '-'}</td>
-                            <td className="px-4 py-3">{r.bom_demand_qty?.toFixed(2) ?? '-'}</td>
+                            <td className="px-4 py-3">{r.bom_demand_qty > 0 ? r.bom_demand_qty.toFixed(2) : '-'}</td>
                             <td className="px-4 py-3">{r.demand_qty?.toFixed(2)}</td>
                             <td className="px-4 py-3">{r.actual_qty?.toFixed(2)}</td>
                             <td className="px-4 py-3"><DeviationBadge value={r.over_issue_qty ?? 0} /></td>
