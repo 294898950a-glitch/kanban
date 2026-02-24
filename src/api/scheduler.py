@@ -11,6 +11,8 @@ from src.db.sync import run_and_sync
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # 使用当前进程的 Python 解释器（兼容 venv 和 Docker）
 PYTHON = sys.executable
+# 子进程环境：继承当前环境并设 PYTHONPATH，使 scraper 能 import src.*
+SUBPROCESS_ENV = {**os.environ, "PYTHONPATH": BASE_DIR}
 
 # 日志打印
 def log(msg: str):
@@ -20,15 +22,15 @@ def run_inventory_and_orders():
     """整点同步：库存 + 工单 + NWMS 发料明细 + 分析"""
     log("开始执行整点同步 (库存+工单+NWMS+分析)...")
     try:
-        subprocess.run([PYTHON, "src/scrapers/inventory_scraper.py"], cwd=BASE_DIR, check=True)
+        subprocess.run([PYTHON, "src/scrapers/inventory_scraper.py"], cwd=BASE_DIR, env=SUBPROCESS_ENV, check=True)
         subprocess.run([
             PYTHON, "src/scrapers/shop_order_scraper.py",
             "--start", "2026-01-01 00:00:00"
-        ], cwd=BASE_DIR, check=True)
+        ], cwd=BASE_DIR, env=SUBPROCESS_ENV, check=True)
         subprocess.run([
             PYTHON, "src/scrapers/nwms_scraper.py",
             "--start", "2026-01-01"
-        ], cwd=BASE_DIR, check=True)
+        ], cwd=BASE_DIR, env=SUBPROCESS_ENV, check=True)
         run_and_sync()
         log("整点同步完毕！")
     except Exception as e:
@@ -38,10 +40,10 @@ def run_nwms_full_sync():
     """重负载全量同步：深夜拉取 NWMS 扫码明细"""
     log("开始执行全量 NWMS 数据同步...")
     try:
-        subprocess.run([PYTHON, "src/scrapers/bom_scraper.py"], cwd=BASE_DIR)
+        subprocess.run([PYTHON, "src/scrapers/bom_scraper.py"], cwd=BASE_DIR, env=SUBPROCESS_ENV)
 
         # 只拉取 2026-01-01 以后的备料单，避免全量历史数据
-        subprocess.run([PYTHON, "src/scrapers/nwms_scraper.py", "--start", "2026-01-01"], cwd=BASE_DIR)
+        subprocess.run([PYTHON, "src/scrapers/nwms_scraper.py", "--start", "2026-01-01"], cwd=BASE_DIR, env=SUBPROCESS_ENV)
         
         # 跑完再次生成审计并同步
         run_and_sync()
