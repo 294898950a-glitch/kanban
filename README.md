@@ -1,6 +1,6 @@
 # 墨工厂物料流转审计仪表盘 — 项目交接文档
 
-> **项目阶段**：第五阶段完成（Docker 化 + 完整部署方案）
+> **项目阶段**：第六阶段完成（Token 自动刷新 + Docker 化 + 完整部署方案）
 > **维护人**：Jay
 > **最后更新**：2026-02-24
 
@@ -115,11 +115,13 @@ matetial_monitor/
 │       ├── alert_report.csv         # 退料预警汇总
 │       └── issue_audit_report.csv   # 超发预警报告
 ├── src/
+│   ├── auth/
+│   │   └── token_manager.py         # IMES/NWMS Token 自动刷新（HZERO OAuth2）
 │   ├── scrapers/
 │   │   ├── inventory_scraper.py     # 线边仓库存（SSRS NTLM）
-│   │   ├── shop_order_scraper.py    # 工单（IMES API）
+│   │   ├── shop_order_scraper.py    # 工单（IMES API，401自动刷新Token）
 │   │   ├── bom_scraper.py           # BOM（IMES API，依赖工单）
-│   │   └── nwms_scraper.py          # 发料明细（NWMS API）
+│   │   └── nwms_scraper.py          # 发料明细（NWMS API，401自动刷新Token）
 │   ├── analysis/
 │   │   └── build_report.py          # 双向审计引擎（返回元组供 sync 调用）
 │   ├── api/
@@ -343,14 +345,20 @@ pnpm run dev
 
 ### 7.1 凭据说明
 
-爬虫优先读取环境变量（Docker 注入），回退到脚本内硬编码值：
+爬虫优先读取环境变量（Docker 注入）。**IMES / NWMS Token 遇到 401 会自动刷新**（无需人工介入）：
 
-| 爬虫 | 环境变量 | 失效判断 |
+| 爬虫 | 环境变量 | 失效处理 |
 |------|---------|---------|
-| `inventory_scraper.py` | `SSRS_USERNAME` / `SSRS_PASSWORD` | 返回 401 |
-| `shop_order_scraper.py` | `IMES_TOKEN` | 返回 0 条或 401 |
-| `bom_scraper.py` | `IMES_TOKEN`（同工单） | 同上 |
-| `nwms_scraper.py` | `NWMS_TOKEN` | 返回 0 条或 401 |
+| `inventory_scraper.py` | `SSRS_USERNAME` / `SSRS_PASSWORD` | 手动更新 `.env` |
+| `shop_order_scraper.py` | `IMES_TOKEN` | **自动刷新**（`src/auth/token_manager.py`） |
+| `bom_scraper.py` | `IMES_TOKEN` | 同上 |
+| `nwms_scraper.py` | `NWMS_TOKEN` | **自动刷新** |
+
+Token 自动刷新通过 HZERO OAuth2 Implicit Flow 实现，需要 `.env` 中配置：
+```
+HZERO_USERNAME=   # 工厂系统账号（IMES 和 NWMS 共用）
+HZERO_PASSWORD=   # 账号密码
+```
 
 ### 7.2 单独运行各爬虫
 
@@ -513,24 +521,22 @@ BOM口径超发量  = actualQuantity - BOM.sumQty（更客观，不受备料员�
 
 `.env` 字段：
 ```
-IMES_TOKEN=      # 工单/BOM Bearer Token
-NWMS_TOKEN=      # NWMS Bearer Token（独立于 IMES）
-SSRS_USERNAME=   # 域账号（如 chenweijie）
-SSRS_PASSWORD=   # 域密码
+IMES_TOKEN=        # 工单/BOM Bearer Token（会自动刷新，初始值填任意有效token即可）
+NWMS_TOKEN=        # NWMS Bearer Token（会自动刷新）
+SSRS_USERNAME=     # 域账号（如 chenweijie）
+SSRS_PASSWORD=     # 域密码
+HZERO_USERNAME=    # HZERO 平台账号（用于 Token 自动刷新）
+HZERO_PASSWORD=    # HZERO 平台密码
 ```
 
-### Token 获取方式
+### Token 说明
 
-**IMES Token**：
-1. 浏览器打开 `http://10.80.35.11:30088`，登录
-2. F12 → Network → 随意执行查询
-3. 复制任意请求 Request Headers 中 `authorization: Bearer` 后的值
+**IMES / NWMS Token（自动管理）**：
+- 爬虫遇到 401 时自动调用 `src/auth/token_manager.py` 重新登录获取新 Token
+- 新 Token 自动写回 `.env` 和环境变量，无需人工介入
+- 前提：`.env` 中 `HZERO_USERNAME` / `HZERO_PASSWORD` 正确
 
-**NWMS Token**：
-1. 浏览器打开 `http://10.80.35.11:91`，登录
-2. F12 → Network → 找任意请求的 `authorization: bearer` 后的值
-
-**SSRS**：域账号密码，由 Jay 维护，不会自动过期。
+**SSRS**：Windows 域账号密码，密码变更后手动更新 `.env` → `docker compose up -d api`。
 
 ---
 
@@ -543,10 +549,10 @@ A: 检查 `.env` Token 是否填写。`docker compose logs api` 查看是否有�
 A: NTLM 认证失败，通常密码已修改。更新 `.env` 中 `SSRS_PASSWORD`。
 
 **Q: shop_order_scraper 返回 0 条或 401？**
-A: IMES Token 过期。按第 13 节步骤获取新 Token 更新 `.env`。
+A: IMES Token 过期，系统会自动刷新。若刷新失败，检查 `.env` 中 `HZERO_USERNAME` / `HZERO_PASSWORD` 是否正确，或账号是否被锁定。
 
-**Q: NWMS Token 如何更新？**
-A: 与 IMES 不同，需单独获取。见第 13 节。Token 更新后 `docker compose restart api` 即生效。
+**Q: NWMS Token 过期怎么办？**
+A: 同 IMES，系统自动刷新。无需手动操作。
 
 **Q: 大量库存记录未匹配到工单？**
 A: 这些库存关联的工单不在 2026-01-01 后的爬取范围内（2025年历史工单）。属正常现象，归为「工单范围外」分层，不计入退料预警。
@@ -611,3 +617,12 @@ A: 执行 `sudo apt install docker-compose-plugin` 安装。
 | .env.example | 四个凭据字段模板 | ✅ |
 | 爬虫 env 支持 | 三个爬虫读取环境变量（硬编码回退） | ✅ |
 | 运维文档 | docs/docker-deploy.txt（完整部署操作手册） | ✅ |
+
+### Phase 6（2026-02-24）— Token 自动刷新
+
+| 类别 | 内容 | 状态 |
+|------|------|------|
+| src/auth/token_manager.py | HZERO OAuth2 Implicit Flow 自动登录，RSA 加密密码 | ✅ |
+| shop_order_scraper.py | 401 触发自动刷新 IMES Token，写回 .env，重试请求 | ✅ |
+| nwms_scraper.py | 401 触发自动刷新 NWMS Token，写回 .env，重试请求 | ✅ |
+| .env | 新增 HZERO_USERNAME / HZERO_PASSWORD 凭据 | ✅ |
