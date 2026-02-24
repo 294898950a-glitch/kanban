@@ -266,18 +266,18 @@ type IssueSort = { key: keyof IssueRow; dir: 1 | -1 }
 function IssueTable({ rows, sort, onSort }: { rows: IssueRow[]; sort: IssueSort; onSort: (s: IssueSort) => void }) {
     if (rows.length === 0) return <Empty />
 
-    const cols: { label: string; key: keyof IssueRow }[] = [
-        { label: '备料单号', key: 'demand_list_number' },
-        { label: '物料编号', key: 'material_code' },
-        { label: '关联工单', key: 'related_wo' },
-        { label: '产线', key: 'production_line' },
-        { label: '计划日期', key: 'plan_issue_date' },
-        { label: 'BOM需求量', key: 'bom_demand_qty' },
-        { label: '计划发料量', key: 'demand_qty' },
-        { label: '实际发料量', key: 'actual_qty' },
-        { label: '超发量', key: 'over_issue_qty' },
-        { label: '超发率', key: 'over_issue_rate' },
-        { label: '超BOM率', key: 'over_vs_bom_rate' },
+    const cols: { label: string; key: keyof IssueRow; w: string }[] = [
+        { label: '备料单号',  key: 'demand_list_number', w: 'w-[200px]' },
+        { label: '物料编号',  key: 'material_code',      w: 'w-[110px]' },
+        { label: '关联工单',  key: 'related_wo',         w: 'w-[130px]' },
+        { label: '产线',      key: 'production_line',    w: 'w-[90px]'  },
+        { label: '计划日期',  key: 'plan_issue_date',    w: 'w-[140px]' },
+        { label: 'BOM需求量', key: 'bom_demand_qty',     w: 'w-[95px]'  },
+        { label: '计划发料量',key: 'demand_qty',         w: 'w-[95px]'  },
+        { label: '实际发料量',key: 'actual_qty',         w: 'w-[95px]'  },
+        { label: '超发量',    key: 'over_issue_qty',     w: 'w-[85px]'  },
+        { label: '超发率',    key: 'over_issue_rate',    w: 'w-[75px]'  },
+        { label: '超BOM率',   key: 'over_vs_bom_rate',   w: 'w-[75px]'  },
     ]
 
     const handleSort = (key: keyof IssueRow) => {
@@ -292,13 +292,13 @@ function IssueTable({ rows, sort, onSort }: { rows: IssueRow[]; sort: IssueSort;
 
     return (
         <div className="overflow-x-auto rounded-lg border border-gray-800">
-            <table className="w-full text-sm text-left text-gray-300">
+            <table className="table-fixed text-sm text-left text-gray-300">
                 <thead className="bg-gray-800 text-gray-400 text-xs uppercase">
                     <tr>
                         {cols.map(c => (
                             <th
                                 key={c.key}
-                                className="px-4 py-3 whitespace-nowrap cursor-pointer hover:text-white select-none"
+                                className={`${c.w} px-4 py-3 whitespace-nowrap cursor-pointer hover:text-white select-none`}
                                 onClick={() => handleSort(c.key)}
                             >
                                 {c.label}{arrow(c.key)}
