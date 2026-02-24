@@ -20,6 +20,7 @@ class KPIHistory(Base):
     unmatched_current_count = Column(Integer, default=0)  # 工单范围外库存（接收≥2026但工单未匹配）
     legacy_count            = Column(Integer, default=0)  # 历史遗留库存（接收<2026或为空）
     confirmed_alert_count_excl = Column(Integer, default=0)  # 剔除通用物料后的退料预警数
+    avg_aging_hours_excl = Column(Float, default=0.0)     # 剔除通用物料后的平均库龄
 
 class AlertReportSnapshot(Base):
     __tablename__ = "alert_report_snapshots"
