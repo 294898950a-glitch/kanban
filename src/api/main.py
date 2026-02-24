@@ -311,6 +311,9 @@ def get_issues_list(batch_id: str = "", q: str = ""):
                 "demand_qty": r.demand_qty,
                 "actual_qty": r.actual_qty,
                 "over_issue_qty": r.over_issue_qty,
+                "over_issue_rate": r.over_issue_rate,
+                "bom_demand_qty": r.bom_demand_qty,
+                "over_vs_bom_rate": r.over_vs_bom_rate,
             }
             for r in rows
         ]

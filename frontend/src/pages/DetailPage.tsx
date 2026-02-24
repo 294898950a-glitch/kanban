@@ -10,7 +10,9 @@ interface AlertRow {
 }
 interface IssueRow {
     demand_list_number: string; material_code: string; related_wo: string
-    production_line: string; demand_qty: number; actual_qty: number; over_issue_qty: number
+    production_line: string; plan_issue_date: string
+    demand_qty: number; actual_qty: number; over_issue_qty: number
+    over_issue_rate: number; bom_demand_qty: number; over_vs_bom_rate: number
 }
 
 function DeviationBadge({ value }: { value: number }) {
@@ -70,6 +72,7 @@ export default function DetailPage() {
     const [issueRows, setIssueRows] = useState<IssueRow[]>([])
     const [alertChip, setAlertChip] = useState<'all' | 'le3' | 'd3_7' | 'd7_14' | 'gt14'>('all')
     const [issueChip, setIssueChip] = useState<'all' | 'over' | 'under'>('all')
+    const [issueSort, setIssueSort] = useState<{ key: keyof IssueRow; dir: 1 | -1 }>({ key: 'over_issue_qty', dir: -1 })
     const [loading, setLoading] = useState(false)
 
     // 加载批次列表
@@ -121,10 +124,17 @@ export default function DetailPage() {
         return true
     })
 
-    const filteredIssues = issueChip === 'over'
-        ? issueRows.filter(r => r.over_issue_qty > 0.01)
-        : issueChip === 'under' ? issueRows.filter(r => r.over_issue_qty < -0.01)
-            : issueRows
+    const filteredIssues = (() => {
+        let rows = issueChip === 'over'
+            ? issueRows.filter(r => r.over_issue_qty > 0.01)
+            : issueChip === 'under' ? issueRows.filter(r => r.over_issue_qty < -0.01)
+                : issueRows
+        return [...rows].sort((a, b) => {
+            const av = a[issueSort.key] ?? 0
+            const bv = b[issueSort.key] ?? 0
+            return av < bv ? -issueSort.dir : av > bv ? issueSort.dir : 0
+        })
+    })()
 
     return (
         <div className="space-y-4">
@@ -195,7 +205,7 @@ export default function DetailPage() {
             {tab === 'alert' ? (
                 <AlertTable rows={filteredAlerts} />
             ) : (
-                <IssueTable rows={filteredIssues} />
+                <IssueTable rows={filteredIssues} sort={issueSort} onSort={setIssueSort} />
             )}
         </div>
     )
@@ -251,15 +261,48 @@ function AlertTable({ rows }: { rows: AlertRow[] }) {
     )
 }
 
-function IssueTable({ rows }: { rows: IssueRow[] }) {
+type IssueSort = { key: keyof IssueRow; dir: 1 | -1 }
+
+function IssueTable({ rows, sort, onSort }: { rows: IssueRow[]; sort: IssueSort; onSort: (s: IssueSort) => void }) {
     if (rows.length === 0) return <Empty />
+
+    const cols: { label: string; key: keyof IssueRow }[] = [
+        { label: '备料单号', key: 'demand_list_number' },
+        { label: '物料编号', key: 'material_code' },
+        { label: '关联工单', key: 'related_wo' },
+        { label: '产线', key: 'production_line' },
+        { label: '计划日期', key: 'plan_issue_date' },
+        { label: 'BOM需求量', key: 'bom_demand_qty' },
+        { label: '计划发料量', key: 'demand_qty' },
+        { label: '实际发料量', key: 'actual_qty' },
+        { label: '超发量', key: 'over_issue_qty' },
+        { label: '超发率', key: 'over_issue_rate' },
+        { label: '超BOM率', key: 'over_vs_bom_rate' },
+    ]
+
+    const handleSort = (key: keyof IssueRow) => {
+        onSort(sort.key === key ? { key, dir: (sort.dir * -1) as 1 | -1 } : { key, dir: -1 })
+    }
+
+    const arrow = (key: keyof IssueRow) =>
+        sort.key === key ? (sort.dir === -1 ? ' ↓' : ' ↑') : ''
+
+    const fmtRate = (v: number | null | undefined) =>
+        v == null ? '-' : `${(v * 100).toFixed(1)}%`
+
     return (
         <div className="overflow-x-auto rounded-lg border border-gray-800">
             <table className="w-full text-sm text-left text-gray-300">
                 <thead className="bg-gray-800 text-gray-400 text-xs uppercase">
                     <tr>
-                        {['备料单号', '物料编号', '关联工单', '产线', '计划发料量', '实际发料量', '超发量'].map(h => (
-                            <th key={h} className="px-4 py-3">{h}</th>
+                        {cols.map(c => (
+                            <th
+                                key={c.key}
+                                className="px-4 py-3 whitespace-nowrap cursor-pointer hover:text-white select-none"
+                                onClick={() => handleSort(c.key)}
+                            >
+                                {c.label}{arrow(c.key)}
+                            </th>
                         ))}
                     </tr>
                 </thead>
@@ -270,9 +313,13 @@ function IssueTable({ rows }: { rows: IssueRow[] }) {
                             <td className="px-4 py-3">{r.material_code}</td>
                             <td className="px-4 py-3">{r.related_wo || '-'}</td>
                             <td className="px-4 py-3">{r.production_line || '-'}</td>
+                            <td className="px-4 py-3 text-gray-500">{r.plan_issue_date || '-'}</td>
+                            <td className="px-4 py-3">{r.bom_demand_qty?.toFixed(2) ?? '-'}</td>
                             <td className="px-4 py-3">{r.demand_qty?.toFixed(2)}</td>
                             <td className="px-4 py-3">{r.actual_qty?.toFixed(2)}</td>
                             <td className="px-4 py-3"><DeviationBadge value={r.over_issue_qty ?? 0} /></td>
+                            <td className="px-4 py-3 text-yellow-400">{fmtRate(r.over_issue_rate)}</td>
+                            <td className="px-4 py-3 text-orange-400">{fmtRate(r.over_vs_bom_rate)}</td>
                         </tr>
                     ))}
                 </tbody>
