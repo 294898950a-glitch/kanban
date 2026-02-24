@@ -48,6 +48,7 @@ def save_to_db(alert_rows, issue_rows, quality_stats, session, batch_id):
         ]),
         over_issue_lines=len([r for r in issue_rows if safe_float(r.get("超发量")) > 0.01]) if issue_rows else 0,
         avg_aging_hours=quality_stats.get("avg_aging_hours_current", 0.0),
+        avg_aging_hours_excl=quality_stats.get("avg_aging_hours_excl", 0.0),
         confirmed_alert_count=quality_stats.get("confirmed_alert_count", 0),
         unmatched_current_count=quality_stats.get("unmatched_current_count", 0),
         legacy_count=quality_stats.get("legacy_count", 0),

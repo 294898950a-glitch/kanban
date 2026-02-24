@@ -475,11 +475,17 @@ def run():
 
     aging_dist = {"le1": 0, "d1_3": 0, "d3_7": 0, "d7_14": 0, "d14_30": 0, "gt30": 0}
     aging_hours_list = []
+    aging_hours_list_excl = []
+
     for r in confirmed_alerts:
         days = _aging_days(r.get("接收时间", ""))
         if days < 0:
             continue
-        aging_hours_list.append(days * 24)
+        
+        hours = days * 24
+        aging_hours_list.append(hours)
+        if r.get("物料编号", "") not in COMMON_MATERIALS:
+            aging_hours_list_excl.append(hours)
         if days <= 1:
             aging_dist["le1"] += 1
         elif days <= 3:
@@ -494,6 +500,7 @@ def run():
             aging_dist["gt30"] += 1
 
     avg_aging_current = round(sum(aging_hours_list) / len(aging_hours_list), 1) if aging_hours_list else 0.0
+    avg_aging_current_excl = round(sum(aging_hours_list_excl) / len(aging_hours_list_excl), 1) if aging_hours_list_excl else 0.0
 
     # ── 数据质量统计 ──
     legacy_rows = [r for r in inventory_raw if _is_legacy(r.get("接收时间", ""))]
@@ -525,6 +532,7 @@ def run():
         "unmatched_current_count": len(unmatched_current),
         "legacy_count": len(legacy_items),
         "avg_aging_hours_current": avg_aging_current,
+        "avg_aging_hours_excl": avg_aging_current_excl,
         "aging_distribution": aging_dist,
     }
     
