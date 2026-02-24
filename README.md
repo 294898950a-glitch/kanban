@@ -98,9 +98,10 @@
 ```
 matetial_monitor/
 ├── README.md                        # 本交接文档
-├── Dockerfile                       # API 镜像（python:3.11-slim）
 ├── docker-compose.yml               # 两服务编排（api + nginx）
-├── nginx.conf                       # nginx 反代配置
+├── deploy/
+│   ├── Dockerfile                   # API 镜像（python:3.11-slim）
+│   └── nginx.conf                   # nginx 反代配置
 ├── .env.example                     # 凭据模板（IMES/NWMS/SSRS）
 ├── .gitignore                       # 已排除 .env / data/ / venv/ 等
 ├── requirements.txt                 # Python 依赖
@@ -497,8 +498,8 @@ BOM口径超发量  = actualQuantity - BOM.sumQty（更客观，不受备料员�
 
 | 任务 | 时间 | 内容 | 耗时 |
 |------|------|------|------|
-| 整点同步 | 每日 06:00–22:00 整点 | 库存(SSRS) + 工单(IMES, `--start 2026-01-01`) + NWMS(`--start 2026-01-01`) + 分析 + 写DB | ~8 分钟 |
-| 深夜全量 | 每日 02:00 | BOM(IMES) + NWMS + 分析 + 写DB | ~15 分钟 |
+| 整点同步 | 每小时整点（全天24小时） | 库存(SSRS) + 工单(IMES, `--start 2026-01-01`) + NWMS(`--start 2026-01-01`) + 分析 + 写DB | ~8 分钟 |
+| 深夜全量 | 每日 02:00 CST | BOM(IMES) + NWMS + 分析 + 写DB | ~15 分钟 |
 
 **批次机制**：每次同步生成新 `batch_id`（时间戳），数据追加写入，旧批次保留用于趋势图。数据库无自动清理，长期运行会增长。
 
@@ -508,7 +509,7 @@ BOM口径超发量  = actualQuantity - BOM.sumQty（更客观，不受备料员�
 
 ### Docker 方式（推荐）
 
-编辑 `.env` 文件，容器通过环境变量读取。Token 更新：编辑 `.env` → `docker compose restart api`。
+编辑 `.env` 文件，容器通过环境变量读取。Token 更新：编辑 `.env` → `docker compose up -d api`（⚠️ 必须用 `up -d`，`restart` 不重载 `.env`）。
 
 `.env` 字段：
 ```
@@ -603,10 +604,10 @@ A: 执行 `sudo apt install docker-compose-plugin` 安装。
 
 | 类别 | 内容 | 状态 |
 |------|------|------|
-| Dockerfile | API 镜像（python:3.11-slim） | ✅ |
+| deploy/Dockerfile | API 镜像（python:3.11-slim，PYTHONUNBUFFERED + TZ=Asia/Shanghai） | ✅ |
 | frontend/Dockerfile | Nginx 镜像（multi-stage node build → nginx） | ✅ |
-| nginx.conf | 反代 /api/ → 127.0.0.1:8000，React Router try_files | ✅ |
-| docker-compose.yml | 两服务（host 网络 + bind mount + env_file + restart） | ✅ |
+| deploy/nginx.conf | 反代 /api/ → 127.0.0.1:8000，React Router try_files | ✅ |
+| docker-compose.yml | 两服务（host 网络 + bind mount + env_file + TZ env） | ✅ |
 | .env.example | 四个凭据字段模板 | ✅ |
 | 爬虫 env 支持 | 三个爬虫读取环境变量（硬编码回退） | ✅ |
 | 运维文档 | docs/docker-deploy.txt（完整部署操作手册） | ✅ |
