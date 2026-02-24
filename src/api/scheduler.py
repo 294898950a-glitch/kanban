@@ -47,7 +47,8 @@ def start_scheduler():
         trigger=CronTrigger(hour=6, minute=0),
         id="morning_full_sync",
         name="晨间全量同步（含BOM）",
-        replace_existing=True
+        replace_existing=True,
+        misfire_grace_time=3600,
     )
 
     # 10/14/18/22 每4小时同步（不含 BOM，工作时段覆盖 CST + 蒙特雷时区）
@@ -56,7 +57,8 @@ def start_scheduler():
         trigger=CronTrigger(hour="10,14,18,22", minute=0),
         id="quad_hourly_sync",
         name="每4小时库存状态同步",
-        replace_existing=True
+        replace_existing=True,
+        misfire_grace_time=3600,
     )
 
     scheduler.start()
