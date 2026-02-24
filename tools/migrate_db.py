@@ -102,5 +102,16 @@ except sqlite3.OperationalError as e:
     else:
         print(f"[MIGRATE] ❌ 错误: {e}")
 
+# 7. 给 kpi_history 表加 confirmed_alert_count_excl 列
+try:
+    cursor.execute("ALTER TABLE kpi_history ADD COLUMN confirmed_alert_count_excl INTEGER DEFAULT 0;")
+    conn.commit()
+    print("[MIGRATE] ✅ kpi_history.confirmed_alert_count_excl 列新增成功")
+except sqlite3.OperationalError as e:
+    if "duplicate column name" in str(e):
+        print("[MIGRATE] ℹ️  kpi_history.confirmed_alert_count_excl 列已存在，跳过")
+    else:
+        print(f"[MIGRATE] ❌ 错误: {e}")
+
 conn.close()
 print("[MIGRATE] 迁移完成")

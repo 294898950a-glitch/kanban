@@ -9,22 +9,6 @@ class KPIHistory(Base):
     batch_id = Column(String(50), unique=True, index=True, nullable=False) # 存放执行批次ID，如：20260223_080000
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)      # 数据快照时间戳
     
-    # 核心统计指标
-    alert_group_count = Column(Integer, default=0)        # 退料预警组数
-    high_risk_count = Column(Integer, default=0)          # 高风险组数(偏差>0)
-    over_issue_lines = Column(Integer, default=0)         # 超发行数
-    avg_aging_hours = Column(Float, default=0.0)          # 平均库龄(小时)
-
-    # Phase 3 KPI 重构：三层分类计数
-    confirmed_alert_count   = Column(Integer, default=0)  # 当期退料预警（完工+已匹配+仍有库存）
-    unmatched_current_count = Column(Integer, default=0)  # 工单范围外库存（接收≥2026但工单未匹配）
-    legacy_count            = Column(Integer, default=0)  # 历史遗留库存（接收<2026或为空）
-
-class AlertReportSnapshot(Base):
-    __tablename__ = "alert_report_snapshots"
-
-    id = Column(Integer, primary_key=True, index=True)
-    batch_id = Column(String(50), index=True, nullable=False)
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)
 
     shop_order = Column(String(50), index=True)           # 工单号
