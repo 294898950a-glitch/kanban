@@ -102,7 +102,7 @@ function Dashboard() {
                 axios.get<AlertTop[]>('/api/alerts/top10', { params: { exclude_common: excludeCommon } }),
                 axios.get<IssueTop[]>('/api/issues/top5'),
                 axios.get<KPITrend[]>('/api/kpi/trend', { params: { exclude_common: excludeCommon } }),
-                axios.get<AgingDistribution>('/api/kpi/aging-distribution')
+                axios.get<AgingDistribution>('/api/kpi/aging-distribution', { params: { exclude_common: excludeCommon } })
             ])
 
             setKpi(kpiRes.data)
@@ -226,7 +226,7 @@ function Dashboard() {
             }).formatToParts(now)
             const min = parseInt(parts.find(p => p.type === 'minute')!.value)
             const sec = parseInt(parts.find(p => p.type === 'second')!.value)
-            const ms  = now.getMilliseconds()
+            const ms = now.getMilliseconds()
             return (60 - min) * 60_000 - sec * 1000 - ms
         }
 
@@ -408,11 +408,10 @@ function Dashboard() {
                             </h3>
                             <button
                                 onClick={() => setExcludeCommon(v => !v)}
-                                className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
-                                    excludeCommon
-                                    ? 'bg-yellow-600 border-yellow-500 text-white'
-                                    : 'bg-gray-700 border-gray-600 text-gray-300 hover:border-gray-400'
-                                }`}
+                                className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${excludeCommon
+                                        ? 'bg-yellow-600 border-yellow-500 text-white'
+                                        : 'bg-gray-700 border-gray-600 text-gray-300 hover:border-gray-400'
+                                    }`}
                             >
                                 {excludeCommon ? '已剔除通用物料' : '含通用物料'}
                             </button>
