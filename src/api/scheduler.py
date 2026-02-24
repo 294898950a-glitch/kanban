@@ -13,50 +13,51 @@ def log(msg: str):
     print(f"[Scheduler] {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - {msg}")
 
 def run_inventory_and_orders():
-    """整点同步：库存 + 工单 + NWMS 发料明细 + 分析"""
-    log("开始执行整点同步 (库存+工单+NWMS+分析)...")
+    """4小时同步：库存 + 工单 + NWMS 发料明细 + 分析"""
+    log("开始执行定时同步 (库存+工单+NWMS+分析)...")
     try:
         run_inventory()
         run_shop_order(start_date="2026-01-01 00:00:00")
         run_nwms(start_date="2026-01-01")
         run_and_sync()
-        log("整点同步完毕！")
+        log("定时同步完毕！")
     except Exception as e:
-        log(f"整点同步执行失败: {e}")
+        log(f"定时同步执行失败: {e}")
 
-def run_nwms_full_sync():
-    """重负载全量同步：深夜拉取 BOM + NWMS 扫码明细"""
-    log("开始执行全量 NWMS 数据同步...")
+def run_morning_full_sync():
+    """06:00 晨间全量同步：BOM + 库存 + 工单 + NWMS + 分析"""
+    log("开始执行晨间全量同步 (BOM+库存+工单+NWMS+分析)...")
     try:
         run_bom()
+        run_inventory()
+        run_shop_order(start_date="2026-01-01 00:00:00")
         run_nwms(start_date="2026-01-01")
         run_and_sync()
-        log("全量 NWMS 审计分析完毕！")
+        log("晨间全量同步完毕！")
     except Exception as e:
-        log(f"全量同步执行失败: {e}")
+        log(f"晨间全量同步执行失败: {e}")
 
 # 初始化调度器
 scheduler = BackgroundScheduler(timezone="Asia/Shanghai")
 
 def start_scheduler():
-    # 每小时整点同步（全天，覆盖中国+墨西哥双时区工作时段）
-    # TZ=Asia/Shanghai 已设置，hour 按 CST 解释
+    # 06:00 晨间全量同步（含 BOM 刷新）
     scheduler.add_job(
-        run_inventory_and_orders,
-        trigger=CronTrigger(minute=0),   # 每小时，不限时段
-        id="hourly_sync",
-        name="每小时库存状态同步",
+        run_morning_full_sync,
+        trigger=CronTrigger(hour=6, minute=0),
+        id="morning_full_sync",
+        name="晨间全量同步（含BOM）",
         replace_existing=True
     )
 
-    # 每天 02:00 CST（墨西哥时间 12:00 前一天）触发深度 NWMS 全量抓取
+    # 10/14/18/22 每4小时同步（不含 BOM，工作时段覆盖 CST + 蒙特雷时区）
     scheduler.add_job(
-        run_nwms_full_sync,
-        trigger=CronTrigger(hour=2, minute=0),
-        id="daily_full_sync",
-        name="凌晨全量发料审计同步",
+        run_inventory_and_orders,
+        trigger=CronTrigger(hour="10,14,18,22", minute=0),
+        id="quad_hourly_sync",
+        name="每4小时库存状态同步",
         replace_existing=True
     )
 
     scheduler.start()
-    log("定时调度器已启动")
+    log("定时调度器已启动（06/10/14/18/22 CST，晨间含BOM全量）")

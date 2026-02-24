@@ -1,7 +1,7 @@
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from src.db.database import SessionLocal
-from src.db.models import KPIHistory, AlertReportSnapshot, IssueAuditSnapshot
+from src.db.models import KPIHistory, AlertReportSnapshot, IssueAuditSnapshot, DataQualitySnapshot
 from src.analysis.build_report import run as build_report_run
 
 def safe_float(val):
@@ -132,14 +132,24 @@ def save_to_db(alert_rows, issue_rows, quality_stats, session, batch_id):
     print(f"  [DB] 快照写入完成，Batch ID: {batch_id}")
     print(f"  [DB] 数据质量快照写入完成")
 
+def purge_old_batches(session, days: int = 30):
+    """删除 N 天前的快照数据，控制 DB 体积"""
+    cutoff = datetime.utcnow() - timedelta(days=days)
+    for Model in [AlertReportSnapshot, IssueAuditSnapshot, DataQualitySnapshot, KPIHistory]:
+        deleted = session.query(Model).filter(Model.timestamp < cutoff).delete()
+        if deleted:
+            print(f"  [PURGE] {Model.__tablename__}: 删除 {deleted} 条过期记录")
+    session.commit()
+
 def run_and_sync():
-    """执行生成报告并同步至数据库"""
+    """执行生成报告并同步至数据库，同步后清理 30 天前数据"""
     print("[SYNC] 执行原分析逻辑并获取数据...")
     alert_rows, issue_rows, quality_stats = build_report_run()
     batch_id = datetime.now().strftime("%Y%m%d_%H%M%S")
     db = SessionLocal()
     try:
         save_to_db(alert_rows, issue_rows, quality_stats, db, batch_id)
+        purge_old_batches(db)
     finally:
         db.close()
 
