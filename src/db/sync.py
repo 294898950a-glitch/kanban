@@ -51,6 +51,7 @@ def save_to_db(alert_rows, issue_rows, quality_stats, session, batch_id):
         confirmed_alert_count=quality_stats.get("confirmed_alert_count", 0),
         unmatched_current_count=quality_stats.get("unmatched_current_count", 0),
         legacy_count=quality_stats.get("legacy_count", 0),
+        confirmed_alert_count_excl=quality_stats.get("confirmed_alert_count_excl", 0),
     )
     session.add(kpi)
 
