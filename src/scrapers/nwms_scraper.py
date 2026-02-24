@@ -26,6 +26,7 @@ NWMS 发料明细爬虫 - 内网 NWMS 仓储系统
 """
 
 import os
+from src.auth.token_manager import refresh_nwms_token
 import requests
 import json
 import csv
@@ -36,23 +37,26 @@ from pathlib import Path
 # ─── 配置区（优先读环境变量，回退到硬编码值）────────────────────────────────
 NWMS_CONFIG = {
     "base_url": "http://10.80.35.11:8080/nwms/v1/9",
-    "token": os.environ.get("NWMS_TOKEN", "e5d87dcf-83fa-4bec-aa3d-c8d3d5b56c7b"),
+    "token": os.environ.get("NWMS_TOKEN", ""),
     "site_id": "2.1",
     "frontend_url": "http://10.80.35.11:91",
-    "page_size": 200,  # 每页条数
+    "page_size": 200,
 }
 
-NWMS_HEADERS = {
-    "accept": "*/*",
-    "authorization": f"bearer {NWMS_CONFIG['token']}",
-    "origin": NWMS_CONFIG["frontend_url"],
-    "referer": f"{NWMS_CONFIG['frontend_url']}/",
-    "user-agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/120.0.0.0 Safari/537.36"
-    ),
-}
+def _make_nwms_headers(token: str) -> dict:
+    return {
+        "accept": "*/*",
+        "authorization": f"bearer {token}",
+        "origin": NWMS_CONFIG["frontend_url"],
+        "referer": f"{NWMS_CONFIG['frontend_url']}/",
+        "user-agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/120.0.0.0 Safari/537.36"
+        ),
+    }
+
+NWMS_HEADERS = _make_nwms_headers(NWMS_CONFIG["token"])
 
 OUTPUT_DIR = Path(__file__).parent.parent.parent / "data" / "raw"
 
@@ -62,7 +66,8 @@ OUTPUT_DIR = Path(__file__).parent.parent.parent / "data" / "raw"
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def fetch_issue_head_page(page: int, **extra_params) -> dict:
-    """拉取备料单头表单页"""
+    """拉取备料单头表单页，401 时自动刷新 Token 并重试"""
+    global NWMS_HEADERS
     url = f"{NWMS_CONFIG['base_url']}/mt-work-orders/ins_woissue_head"
     params = {
         "page": page,
@@ -71,6 +76,11 @@ def fetch_issue_head_page(page: int, **extra_params) -> dict:
         **extra_params,
     }
     resp = requests.get(url, headers=NWMS_HEADERS, params=params, timeout=30)
+    if resp.status_code == 401:
+        print("[TokenManager] NWMS Token 已过期，自动刷新...")
+        new_token = refresh_nwms_token()
+        NWMS_HEADERS = _make_nwms_headers(new_token)
+        resp = requests.get(url, headers=NWMS_HEADERS, params=params, timeout=30)
     resp.raise_for_status()
     return resp.json()
 

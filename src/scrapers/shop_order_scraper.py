@@ -11,34 +11,40 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+from src.auth.token_manager import refresh_imes_token
+
 # ─── 配置区（优先读环境变量，回退到硬编码值）────────────────────────────────
 CONFIG = {
     "base_url": "http://10.80.35.11:8080/imes-service/v1/0/shopOrder",
-    "token": os.environ.get("IMES_TOKEN", "4b0e382c-de14-4e90-b4f4-e886ddb2b215"),
+    "token": os.environ.get("IMES_TOKEN", ""),
     "site": "2010",
-    "page_size": 100,  # 每页条数，可调大以减少请求次数
+    "page_size": 100,
 }
 
-HEADERS = {
-    "accept": "application/json, text/plain, */*",
-    "accept-language": "zh-CN,zh;q=0.9,en;q=0.8",
-    "authorization": f"Bearer {CONFIG['token']}",
-    "menu": "",
-    "system": "IMES",
-    "origin": "http://10.80.35.11:30088",
-    "referer": "http://10.80.35.11:30088/",
-    "user-agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/120.0.0.0 Safari/537.36"
-    ),
-}
+def _make_headers(token: str) -> dict:
+    return {
+        "accept": "application/json, text/plain, */*",
+        "accept-language": "zh-CN,zh;q=0.9,en;q=0.8",
+        "authorization": f"Bearer {token}",
+        "menu": "",
+        "system": "IMES",
+        "origin": "http://10.80.35.11:30088",
+        "referer": "http://10.80.35.11:30088/",
+        "user-agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/120.0.0.0 Safari/537.36"
+        ),
+    }
+
+HEADERS = _make_headers(CONFIG["token"])
 
 OUTPUT_DIR = Path(__file__).parent.parent.parent / "data" / "raw"
 
 
 def fetch_page(page: int, start_date: str, classes: str = "A") -> dict:
-    """拉取单页工单数据"""
+    """拉取单页工单数据，401 时自动刷新 Token 并重试"""
+    global HEADERS
     params = {
         "signTime": int(time.time() * 1000),
         "page": page,
@@ -51,6 +57,11 @@ def fetch_page(page: int, start_date: str, classes: str = "A") -> dict:
         "language": "zh_CN",
     }
     resp = requests.get(CONFIG["base_url"], headers=HEADERS, params=params, timeout=30)
+    if resp.status_code == 401:
+        print("[TokenManager] IMES Token 已过期，自动刷新...")
+        new_token = refresh_imes_token()
+        HEADERS = _make_headers(new_token)
+        resp = requests.get(CONFIG["base_url"], headers=HEADERS, params=params, timeout=30)
     resp.raise_for_status()
     return resp.json()
 
