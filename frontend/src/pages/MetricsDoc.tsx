@@ -54,8 +54,19 @@ export default function MetricsDoc() {
                     <MetricTable rows={[
                         ['当期退料预警', '分析计算', '匹配 2026 年工单 + 已完工 + 线边仓仍有库存，需立即退料处理'],
                         ['工单范围外库存', '分析计算', '接收时间≥2026 但关联工单不在 IMES 监控窗口，需人工核查归属'],
-                        ['历史遗留库存', '分析计算', '接收时间<2026 或无记录，保留展示但不计入预警'],
+                        ['历史遗留库存', '分析计算', '接收时间<2026 或无记录的线边仓库存组合数（工单+物料），不计入预警但保留展示'],
+                        ['进场：超发预警', '分析计算', 'NWMS 实际发料量超出计划发料量的行数，跨备料单汇总'],
                         ['当期平均库龄', '分析计算', '仅统计当期退料预警物料的平均滞留时长（小时）'],
+                    ]} />
+                </div>
+
+                <div className="mt-4">
+                    <h3 className="text-sm font-medium text-gray-300 mb-2">趋势图指标说明</h3>
+                    <MetricTable rows={[
+                        ['退料预警总量', '分析计算', '所有完工工单仍有库存的组合数，含当期 + 历史遗留中已完工部分（= 当期退料预警 + 遗留已完工预警）'],
+                        ['当期退料预警', '分析计算', '退料预警总量的子集：仅限接收时间≥2026 且工单在监控窗口内的部分，差值即为历史遗留中的完工预警'],
+                        ['超发预警行数', '分析计算', '与「进场：超发预警」KPI 卡片同一数值，在趋势图中展示历史变化'],
+                        ['当期平均库龄', '分析计算', '与 KPI 卡片同一数值（小时），在专用趋势图中展示历史变化'],
                     ]} />
                 </div>
 
@@ -78,9 +89,11 @@ export default function MetricsDoc() {
                 <div className="mt-4">
                     <h3 className="text-sm font-medium text-gray-300 mb-2">字段说明</h3>
                     <MetricTable rows={[
+                        ['工单号', 'SSRS / IMES', '生产工单编号，三表关联核心 Key'],
                         ['实际库存量', 'SSRS 线边仓', '该（工单, 物料）组合在线边仓的现存总量（所有条码汇总）'],
-                        ['单位', 'SSRS 线边仓', '物料计量单位（EA / PCS 等）'],
-                        ['条码', 'SSRS 线边仓', '该组合在线边仓的独立批次/条码列表，可追溯实物位置'],
+                        ['单位', 'SSRS 线边仓', '物料计量单位（EA / PCS / M 等）'],
+                        ['条码数', 'SSRS 线边仓', '该组合对应的独立条码/批次数量'],
+                        ['条码', 'SSRS 线边仓', '展开显示各条码编号，可追溯实物位置，支持关键字搜索'],
                         ['库龄', '分析计算', '当前时间 − 最早接收时间（天），颜色规则与色带一致'],
                     ]} />
                 </div>
@@ -110,13 +123,17 @@ export default function MetricsDoc() {
                 <div className="mt-4">
                     <h3 className="text-sm font-medium text-gray-300 mb-1">字段说明</h3>
                     <MetricTable rows={[
+                        ['备料单号', 'NWMS 备料单', 'NWMS 系统的发料指令单据编号（instructionDocId）'],
+                        ['物料编号', 'NWMS / IMES', '发料物料的编号，可与 BOM 和线边仓库存关联'],
+                        ['关联工单', 'NWMS 备料单', '该备料单关联的生产工单号，可能含多个（逗号分隔）'],
+                        ['产线', 'NWMS 备料单', '发料目标产线名称'],
+                        ['计划发料日期', 'NWMS 备料单', '备料单计划执行日期（ppStartTime），用于判断发料是否滞后'],
+                        ['BOM标准需求量', 'IMES BOM', '工单计划量 × BOM单件用量（sumQty），不受备料员填单影响的客观基准'],
                         ['计划发料量', 'NWMS 备料单', '备料员录入的计划数量（demandQuantity）'],
                         ['实际发料量', 'NWMS 扫码明细', '仓库人员实际扫码入线边仓的数量（actualQuantity）'],
                         ['超发量', '分析计算', '实际 − 计划，> 0 即超发（NWMS 口径）'],
-                        ['超发率%', '分析计算', '超发比例，用于评估偏差严重程度'],
-                        ['BOM标准需求量', 'IMES BOM', '工单计划量 × BOM单件用量（sumQty），客观基准'],
-                        ['超发量(vs BOM)', '分析计算', '实际 − BOM标准需求量，反映对系统理论用量的超出'],
-                        ['超发率%(vs BOM)', '分析计算', 'BOM 口径的超发比例'],
+                        ['超发率%', '分析计算', 'NWMS 口径超发比例，用于评估偏差严重程度'],
+                        ['超BOM率%', '分析计算', '实际发料量相对 BOM 标准需求量的超出比例，更客观'],
                     ]} />
                 </div>
             </section>
@@ -136,17 +153,17 @@ export default function MetricsDoc() {
                         <tr className="border-b border-gray-800">
                             <td className="py-2 pr-4 font-medium text-white">IMES</td>
                             <td className="py-2 pr-4">工单状态（每小时）、BOM 明细（凌晨）</td>
-                            <td className="py-2 text-green-400">每日 6–22 点整点 / 凌晨 2 点</td>
+                            <td className="py-2 text-green-400">全天整点 / 凌晨 2 点</td>
                         </tr>
                         <tr className="border-b border-gray-800">
                             <td className="py-2 pr-4 font-medium text-white">SSRS</td>
                             <td className="py-2 pr-4">线边仓库存（条码级）</td>
-                            <td className="py-2 text-green-400">每日 6–22 点整点</td>
+                            <td className="py-2 text-green-400">全天整点</td>
                         </tr>
                         <tr>
                             <td className="py-2 pr-4 font-medium text-white">NWMS</td>
                             <td className="py-2 pr-4">备料单发料明细（2026年起）</td>
-                            <td className="py-2 text-green-400">每日 6–22 点整点 / 凌晨 2 点</td>
+                            <td className="py-2 text-green-400">全天整点 / 凌晨 2 点</td>
                         </tr>
                     </tbody>
                 </table>
