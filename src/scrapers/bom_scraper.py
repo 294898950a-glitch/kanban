@@ -8,7 +8,7 @@ import json
 import csv
 import time
 from pathlib import Path
-from shop_order_scraper import CONFIG, HEADERS  # 复用配置
+from src.scrapers.shop_order_scraper import CONFIG, HEADERS  # 复用配置
 
 BOM_URL = "http://10.80.35.11:8080/imes-service/v1/0/shopOrder/bom"
 OUTPUT_DIR = Path(__file__).parent.parent.parent / "data" / "raw"
