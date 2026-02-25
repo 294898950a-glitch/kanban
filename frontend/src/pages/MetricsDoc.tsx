@@ -106,6 +106,51 @@ export default function MetricsDoc() {
                         ['库龄', '分析计算', '当前时间 − 最早接收时间（天），颜色规则与色带一致'],
                     ]} />
                 </div>
+
+                <div className="mt-6">
+                    <h3 className="text-sm font-medium text-gray-300 mb-2">物料用途状态</h3>
+                    <p className="text-xs text-gray-400 mb-3">
+                        每条线边仓库存基于其关联工单的当前状态，动态标注用途。明细页可按状态筛选；
+                        仪表盘退料预警列表额外显示「复用」徽标。
+                    </p>
+                    <div className="space-y-2">
+                        {[
+                            {
+                                chip: { bg: '#14532d55', color: '#4ade80', border: '#16a34a' },
+                                label: '🟢 当前生产',
+                                desc: '该物料的指定工单正在生产中（工单状态：Se ha iniciado la construcción）。物料处于正常在线状态，无需干预。',
+                            },
+                            {
+                                chip: { bg: '#1e3a5f55', color: '#93c5fd', border: '#3b82f6' },
+                                label: '🔵 即将生产',
+                                desc: '指定工单已下发但尚未开工（工单状态：Se puede emitir）。物料已备好，等待开线。',
+                            },
+                            {
+                                chip: { bg: '#7c2d1255', color: '#fb923c', border: '#c2410c' },
+                                label: '🟠 已完工待退',
+                                desc: '指定工单已完工，但线边仓仍有该物料库存。属于退料预警范围，需尽快退库。',
+                            },
+                            {
+                                chip: { bg: '#14532d55', color: '#4ade80', border: '#16a34a' },
+                                label: '🔄 当前工单复用',
+                                desc: '工单已完工（本应退料），但该物料编号同时出现在某个在制工单的 BOM 中。可直接转给在制工单使用，无需走退库再发料流程，优先级低于纯退料行。',
+                            },
+                            {
+                                chip: { bg: '#1e3a5f55', color: '#93c5fd', border: '#3b82f6' },
+                                label: '🔄 下工单复用',
+                                desc: '工单已完工（本应退料），但该物料编号出现在某个待开工工单的 BOM 中。可暂缓退料，等待下一工单开线后直接转用。',
+                            },
+                        ].map(({ chip, label, desc }) => (
+                            <div key={label} className="flex items-start gap-3 p-3 bg-gray-800 rounded-lg">
+                                <span className="shrink-0 mt-0.5 inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium border"
+                                    style={{ background: chip.bg, color: chip.color, borderColor: chip.border }}>
+                                    {label}
+                                </span>
+                                <p className="text-xs text-gray-300 leading-relaxed">{desc}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
             </section>
 
             {/* 进场审计 */}
