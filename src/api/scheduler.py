@@ -1,6 +1,7 @@
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
-from datetime import datetime
+from datetime import datetime, timedelta
+import threading
 
 from src.db.sync import run_and_sync
 from src.scrapers.inventory_scraper import run as run_inventory
@@ -37,6 +38,46 @@ def run_morning_full_sync():
     except Exception as e:
         log(f"晨间全量同步执行失败: {e}")
 
+def _last_scheduled_time(now: datetime) -> datetime:
+    """返回当前时间之前最近一个应触发的调度时刻（06/10/14/18/22 CST）"""
+    scheduled_hours = [6, 10, 14, 18, 22]
+    past = [h for h in scheduled_hours if h <= now.hour]
+    if past:
+        return now.replace(hour=max(past), minute=0, second=0, microsecond=0)
+    # 还没到今天06:00，取昨天22:00
+    return (now - timedelta(days=1)).replace(hour=22, minute=0, second=0, microsecond=0)
+
+
+def check_and_catchup():
+    """启动时检测是否跳过同步，若跳过则异步补跑一次"""
+    from src.db.database import SessionLocal
+    from src.db.models import KPIHistory
+    from sqlalchemy import select, desc
+
+    db = SessionLocal()
+    try:
+        latest = db.execute(
+            select(KPIHistory).order_by(desc(KPIHistory.timestamp)).limit(1)
+        ).scalar_one_or_none()
+    finally:
+        db.close()
+
+    if latest is None:
+        log("首次启动，无历史数据，跳过补跑检查")
+        return
+
+    now = datetime.now()
+    last_sync = latest.timestamp
+    last_scheduled = _last_scheduled_time(now)
+
+    if last_sync < last_scheduled:
+        log(f"[补跑] 检测到跳过同步：上次={last_sync.strftime('%m-%d %H:%M')}，"
+            f"应在 {last_scheduled.strftime('%m-%d %H:%M')} 同步，立即补跑...")
+        threading.Thread(target=run_inventory_and_orders, daemon=True, name="catchup").start()
+    else:
+        log(f"无需补跑，上次同步={last_sync.strftime('%m-%d %H:%M')}")
+
+
 # 初始化调度器
 scheduler = BackgroundScheduler(timezone="Asia/Shanghai")
 
@@ -63,3 +104,4 @@ def start_scheduler():
 
     scheduler.start()
     log("定时调度器已启动（06/10/14/18/22 CST，晨间含BOM全量）")
+    check_and_catchup()
