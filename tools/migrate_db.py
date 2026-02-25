@@ -113,5 +113,45 @@ except sqlite3.OperationalError as e:
     else:
         print(f"[MIGRATE] ❌ 错误: {e}")
 
+# Phase 8 - Step 1: alert_report_snapshots 新增 reuse_label 列
+try:
+    cursor.execute("ALTER TABLE alert_report_snapshots ADD COLUMN reuse_label VARCHAR(20) DEFAULT '';")
+    conn.commit()
+    print("[MIGRATE] ✅ alert_report_snapshots.reuse_label 列新增成功")
+except sqlite3.OperationalError as e:
+    if "duplicate column name" in str(e):
+        print("[MIGRATE] ℹ️  alert_report_snapshots.reuse_label 列已存在，跳过")
+    else:
+        print(f"[MIGRATE] ❌ 错误: {e}")
+
+# Phase 8 - Step 2: 新建 inventory_status_snapshots 表
+try:
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS inventory_status_snapshots (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            batch_id VARCHAR(50) NOT NULL,
+            timestamp DATETIME,
+            shop_order VARCHAR(50),
+            material_code VARCHAR(50),
+            material_desc TEXT,
+            warehouse VARCHAR(100),
+            unit VARCHAR(20),
+            actual_inventory REAL DEFAULT 0.0,
+            barcode_count INTEGER DEFAULT 0,
+            order_status VARCHAR(50),
+            wo_status_label VARCHAR(20) DEFAULT '',
+            receive_time VARCHAR(50),
+            is_legacy INTEGER DEFAULT 0,
+            barcode_list TEXT DEFAULT '[]',
+            reuse_label VARCHAR(20) DEFAULT '',
+            theory_remain REAL DEFAULT 0.0,
+            deviation REAL DEFAULT 0.0
+        );
+    """)
+    conn.commit()
+    print("[MIGRATE] ✅ inventory_status_snapshots 表已就绪")
+except sqlite3.OperationalError as e:
+    print(f"[MIGRATE] ❌ 错误: {e}")
+
 conn.close()
 print("[MIGRATE] 迁移完成")

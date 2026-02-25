@@ -25,7 +25,34 @@ from src.config.common_materials import COMMON_MATERIALS
 
 BASE = Path(__file__).parent.parent.parent / "data" / "raw"
 
-COMPLETED_STATUSES = {"Completado", "完成", "Completed", "已完成", "Se ha iniciado la construcción"}
+COMPLETED_STATUSES = {"Completado", "完成", "Completed", "已完成"}
+
+CURRENT_STATUSES  = {"Se ha iniciado la construcción"}
+UPCOMING_STATUSES = {"Se puede emitir"}
+
+def _wo_status_label(status_desc: str) -> str:
+    if status_desc in CURRENT_STATUSES:
+        return "current"
+    if status_desc in UPCOMING_STATUSES:
+        return "upcoming"
+    if status_desc in COMPLETED_STATUSES:
+        return "completed"
+    return ""
+
+def _build_reuse_sets(orders, bom_index):
+    """构建在制/待开工工单的 BOM 物料集合"""
+    current_wos = {wo for wo, order in orders.items() if order.get("statusDesc", "") in CURRENT_STATUSES}
+    upcoming_wos = {wo for wo, order in orders.items() if order.get("statusDesc", "") in UPCOMING_STATUSES}
+    current_bom_mats = {mat for (bom_wo, mat) in bom_index if bom_wo in current_wos}
+    upcoming_bom_mats = {mat for (bom_wo, mat) in bom_index if bom_wo in upcoming_wos}
+    return current_bom_mats, upcoming_bom_mats
+
+def _calc_reuse_label(mat: str, current_bom_mats: set, upcoming_bom_mats: set) -> str:
+    if mat in current_bom_mats:
+        return "reuse_current"
+    if mat in upcoming_bom_mats:
+        return "reuse_upcoming"
+    return ""
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -167,6 +194,7 @@ def load_nwms_lines():
 
 def build_return_alert(orders, bom_index, inventory):
     """生成退料预警报告"""
+    current_bom_mats, upcoming_bom_mats = _build_reuse_sets(orders, bom_index)
     results = []
 
     for (wo, mat), inv in inventory.items():
@@ -212,12 +240,74 @@ def build_return_alert(orders, bom_index, inventory):
             "最新发料时间": inv["issue_time"],
             "is_legacy": _is_legacy(inv["receive_time"]),
             "aging_days": round((datetime.now() - _parse_date(inv["receive_time"])).total_seconds() / 86400, 1) if _parse_date(inv["receive_time"]) else -1.0,
+            "reuse_label": _calc_reuse_label(mat, current_bom_mats, upcoming_bom_mats),
         })
 
     results.sort(key=lambda x: (
         -(x["偏差(实际-理论)"] if isinstance(x["偏差(实际-理论)"], float) else 0),
         x["工单号"],
     ))
+    return results
+
+
+def build_inventory_status(orders, bom_index, inventory):
+    """
+    全量线边仓物料状态分析（A 功能）：
+    - 处理所有有工单关联的库存行（不按完工过滤）
+    - 赋予 wo_status_label（current/upcoming/completed/""）
+    - 对 completed 行赋予 reuse_label（是否被在制/待开工工单BOM复用）
+    """
+    # 构建在制/待开工工单的 BOM 物料集合（用于 reuse_label 判断）
+    current_bom_mats, upcoming_bom_mats = _build_reuse_sets(orders, bom_index)
+
+    results = []
+    for (wo, mat), inv in inventory.items():
+        order = orders.get(wo)
+        if not order:
+            continue  # 工单不在 IMES 窗口内，跳过
+
+        status_desc = order.get("statusDesc", "")
+        label = _wo_status_label(status_desc)
+
+        bom = bom_index.get((wo, mat))
+        qty_done    = float(order.get("qtyDone") or 0)
+        if bom:
+            unit_qty   = float(bom.get("qty") or 0)
+            sum_qty    = float(bom.get("sumQty") or 0)
+            theory_rem = sum_qty - qty_done * unit_qty
+        else:
+            unit_qty = sum_qty = theory_rem = 0.0
+
+        actual_inv = inv["qty"]
+        deviation  = round(actual_inv - theory_rem, 2) if sum_qty > 0 else 0.0
+
+        # reuse_label：仅对 completed 行判断
+        reuse = ""
+        if label == "completed":
+            if mat in current_bom_mats:
+                reuse = "reuse_current"
+            elif mat in upcoming_bom_mats:
+                reuse = "reuse_upcoming"
+
+        results.append({
+            "工单号":        wo,
+            "物料编号":      mat,
+            "物料描述":      inv["desc"],
+            "线边仓":        inv["warehouse"],
+            "单位":          inv["unit"],
+            "实际库存(合计)": round(actual_inv, 2),
+            "条码数":        inv["barcodes"],
+            "barcode_list":  inv.get("barcode_list", []),
+            "工单状态":      status_desc,
+            "wo_status_label": label,
+            "接收时间":      inv["receive_time"],
+            "is_legacy":     _is_legacy(inv["receive_time"]),
+            "理论余料":      round(theory_rem, 2),
+            "偏差(实际-理论)": deviation,
+            "reuse_label":   reuse,
+        })
+
+    results.sort(key=lambda x: (x["wo_status_label"], -x["实际库存(合计)"]))
     return results
 
 
@@ -536,7 +626,15 @@ def run():
         "aging_distribution": aging_dist,
     }
     
-    return alert, issue_audit, quality_stats
+    print("\n─── 全量库存状态分析（Phase 8）────────────────────")
+    inventory_status = build_inventory_status(orders, bom_index, inventory)
+    print(f"  全量库存行: {len(inventory_status)} 组")
+    current_cnt  = sum(1 for r in inventory_status if r["wo_status_label"] == "current")
+    upcoming_cnt = sum(1 for r in inventory_status if r["wo_status_label"] == "upcoming")
+    completed_cnt= sum(1 for r in inventory_status if r["wo_status_label"] == "completed")
+    print(f"  当前生产: {current_cnt}  即将生产: {upcoming_cnt}  已完工待退: {completed_cnt}")
+
+    return alert, issue_audit, quality_stats, inventory_status
 
 if __name__ == "__main__":
     run()

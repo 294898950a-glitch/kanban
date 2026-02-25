@@ -8,9 +8,22 @@ import json
 
 from src.config.common_materials import COMMON_MATERIALS
 from src.db.database import get_db, SessionLocal
-from src.db.models import KPIHistory, AlertReportSnapshot, IssueAuditSnapshot, DataQualitySnapshot
+from src.db.models import KPIHistory, AlertReportSnapshot, IssueAuditSnapshot, DataQualitySnapshot, InventoryStatusSnapshot
 from src.api.scheduler import start_scheduler
 from contextlib import asynccontextmanager
+
+def calculate_aging_days(receive_time_str) -> float:
+    if not receive_time_str:
+        return -1.0
+    try:
+        s = str(receive_time_str).strip().split(" ")[0].replace("/", "-")
+        parts = s.split("-")
+        if len(parts) == 3:
+            s = f"{parts[0]}-{int(parts[1]):02d}-{int(parts[2]):02d}"
+        return round((datetime.utcnow() - datetime.strptime(s, "%Y-%m-%d")).total_seconds() / 86400, 1)
+    except Exception:
+        return -1.0
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -96,41 +109,30 @@ def get_aging_distribution(exclude_common: bool = False):
         if not latest:
             return {"le1": 0, "d1_3": 0, "d3_7": 0, "d7_14": 0, "d14_30": 0, "gt30": 0}
 
-        from datetime import datetime as dt
-        now = dt.utcnow()
         stmt = select(AlertReportSnapshot) \
             .where(AlertReportSnapshot.batch_id == latest.batch_id) \
             .where(AlertReportSnapshot.is_legacy == 0)
-        
+
         if exclude_common:
             stmt = stmt.where(AlertReportSnapshot.material_code.not_in(list(COMMON_MATERIALS)))
-            
+
         rows = db.execute(stmt).scalars().all()
 
         dist = {"le1": 0, "d1_3": 0, "d3_7": 0, "d7_14": 0, "d14_30": 0, "gt30": 0}
         for r in rows:
-            if not r.receive_time: continue
-            try:
-                # 兼容 SSRS 的多种可能是以 / 或 - 分割的格式，如 2026/2/6 或 2026-02-06
-                s = str(r.receive_time).strip().split(" ")[0].replace("/", "-")
-                parts = s.split("-")
-                if len(parts) == 3:
-                    s = f"{parts[0]}-{int(parts[1]):02d}-{int(parts[2]):02d}"
-                recv = dt.strptime(s, "%Y-%m-%d")
-                days = (now - recv).days
-            except (ValueError, TypeError, IndexError):
-                continue
-            if days <= 1:   dist["le1"]   += 1
-            elif days <= 3: dist["d1_3"]  += 1
-            elif days <= 7: dist["d3_7"]  += 1
-            elif days <= 14: dist["d7_14"] += 1
+            days = calculate_aging_days(r.receive_time)
+            if days < 0: continue
+            if days <= 1:    dist["le1"]    += 1
+            elif days <= 3:  dist["d1_3"]   += 1
+            elif days <= 7:  dist["d3_7"]   += 1
+            elif days <= 14: dist["d7_14"]  += 1
             elif days <= 30: dist["d14_30"] += 1
-            else:            dist["gt30"]  += 1
+            else:            dist["gt30"]   += 1
         return dist
     finally:
         db.close()
 
-COMPLETED_STATUSES = {'Completado', '完成', 'Completed', '已完成', 'Se ha iniciado la construcción'}
+COMPLETED_STATUSES = {'Completado', '完成', 'Completed', '已完成'}
 
 @app.get("/api/alerts/top10")
 def get_alerts_top10(exclude_common: bool = False):
@@ -143,17 +145,6 @@ def get_alerts_top10(exclude_common: bool = False):
         
         if not latest_kpi:
             return []
-
-        def _calc_aging(rt) -> float:
-            try:
-                from datetime import datetime as dt
-                s = str(rt).strip().split(" ")[0].replace("/", "-")
-                parts = s.split("-")
-                if len(parts) == 3:
-                    s = f"{parts[0]}-{int(parts[1]):02d}-{int(parts[2]):02d}"
-                return round((dt.utcnow() - dt.strptime(s, "%Y-%m-%d")).total_seconds() / 86400, 1)
-            except Exception:
-                return -1.0
 
         stmt = select(AlertReportSnapshot) \
             .where(AlertReportSnapshot.batch_id == latest_kpi.batch_id) \
@@ -173,7 +164,8 @@ def get_alerts_top10(exclude_common: bool = False):
                 "actual_inventory": r.actual_inventory,
                 "unit": r.unit,
                 "barcode_count": r.barcode_count,
-                "aging_days": _calc_aging(r.receive_time),
+                "aging_days": calculate_aging_days(r.receive_time),
+                "reuse_label": r.reuse_label or "",
             }
             for r in rows
         ]
@@ -256,17 +248,6 @@ def get_alerts_list(batch_id: str = "", q: str = "", exclude_common: bool = Fals
         stmt = stmt.order_by(desc(AlertReportSnapshot.deviation))
         rows = db.execute(stmt).scalars().all()
 
-        def _calc_aging_days(receive_time_str) -> float:
-            try:
-                from datetime import datetime as dt
-                s = str(receive_time_str).strip().split(" ")[0].replace("/", "-")
-                parts = s.split("-")
-                if len(parts) == 3:
-                    s = f"{parts[0]}-{int(parts[1]):02d}-{int(parts[2]):02d}"
-                return round((dt.utcnow() - dt.strptime(s, "%Y-%m-%d")).total_seconds() / 86400, 1)
-            except Exception:
-                return -1.0
-
         return [
             {
                 "shop_order": r.shop_order,
@@ -277,9 +258,10 @@ def get_alerts_list(batch_id: str = "", q: str = "", exclude_common: bool = Fals
                 "unit": r.unit,
                 "barcode_count": r.barcode_count,
                 "barcode_list": json.loads(r.barcode_list or "[]"),
-                "aging_days": _calc_aging_days(r.receive_time),
+                "aging_days": calculate_aging_days(r.receive_time),
                 "theory_remain": r.theory_remain,
                 "deviation": r.deviation,
+                "reuse_label": r.reuse_label or "",
             }
             for r in rows
         ]
@@ -326,3 +308,66 @@ def get_issues_list(batch_id: str = "", q: str = ""):
         ]
     finally:
         db.close()
+
+@app.get("/api/inventory/status")
+def get_inventory_status(batch_id: str = "", q: str = "", label: str = "", exclude_common: bool = False):
+    """
+    全量线边仓物料状态快照（Phase 8）
+    label 过滤：current / upcoming / completed / reuse_current / reuse_upcoming / 空=全部
+    """
+    db = SessionLocal()
+    try:
+        if not batch_id:
+            latest = db.execute(
+                select(KPIHistory).order_by(desc(KPIHistory.timestamp)).limit(1)
+            ).scalar_one_or_none()
+            if not latest:
+                return []
+            batch_id = latest.batch_id
+
+        stmt = select(InventoryStatusSnapshot).where(
+            InventoryStatusSnapshot.batch_id == batch_id
+        )
+        if q:
+            stmt = stmt.where(
+                InventoryStatusSnapshot.shop_order.contains(q) |
+                InventoryStatusSnapshot.material_code.contains(q) |
+                InventoryStatusSnapshot.barcode_list.contains(q)
+            )
+        if label in ("current", "upcoming", "completed"):
+            stmt = stmt.where(InventoryStatusSnapshot.wo_status_label == label)
+        elif label in ("reuse_current", "reuse_upcoming"):
+            stmt = stmt.where(InventoryStatusSnapshot.reuse_label == label)
+
+        if exclude_common:
+            stmt = stmt.where(InventoryStatusSnapshot.material_code.not_in(list(COMMON_MATERIALS)))
+
+        stmt = stmt.order_by(
+            InventoryStatusSnapshot.wo_status_label,
+            desc(InventoryStatusSnapshot.actual_inventory)
+        )
+        rows = db.execute(stmt).scalars().all()
+
+        return [
+            {
+                "shop_order":       r.shop_order,
+                "material_code":    r.material_code,
+                "material_desc":    r.material_desc,
+                "warehouse":        r.warehouse,
+                "unit":             r.unit,
+                "actual_inventory": r.actual_inventory,
+                "barcode_count":    r.barcode_count,
+                "barcode_list":     json.loads(r.barcode_list or "[]"),
+                "order_status":     r.order_status,
+                "wo_status_label":  r.wo_status_label or "",
+                "aging_days":       calculate_aging_days(r.receive_time),
+                "is_legacy":        r.is_legacy,
+                "reuse_label":      r.reuse_label or "",
+                "theory_remain":    r.theory_remain,
+                "deviation":        r.deviation,
+            }
+            for r in rows
+        ]
+    finally:
+        db.close()
+

@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import * as echarts from 'echarts'
 import axios from 'axios'
+import { WoStatusChip } from '../components/WoStatusChip'
 
 interface KPISummary {
     batch_id: string;
@@ -41,6 +42,7 @@ interface AlertTop {
     unit: string;
     barcode_count: number;
     aging_days: number;
+    reuse_label: string;
 }
 
 interface IssueTop {
@@ -409,8 +411,8 @@ function Dashboard() {
                             <button
                                 onClick={() => setExcludeCommon(v => !v)}
                                 className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${excludeCommon
-                                        ? 'bg-yellow-600 border-yellow-500 text-white'
-                                        : 'bg-gray-700 border-gray-600 text-gray-300 hover:border-gray-400'
+                                    ? 'bg-yellow-600 border-yellow-500 text-white'
+                                    : 'bg-gray-700 border-gray-600 text-gray-300 hover:border-gray-400'
                                     }`}
                             >
                                 {excludeCommon ? '已剔除通用物料' : '含通用物料'}
@@ -433,7 +435,10 @@ function Dashboard() {
                                 <div key={i} className="bg-gray-800 bg-opacity-50 p-3 rounded border border-gray-700 hover:border-red-500/50 transition-colors">
                                     <div className="flex justify-between items-start mb-1">
                                         <span className="text-xs font-semibold text-white">{a.shop_order}</span>
-                                        <AgingBadgeSmall days={a.aging_days} />
+                                        <div className="flex items-center gap-2">
+                                            <WoStatusChip label="completed" reuse={a.reuse_label} />
+                                            <AgingBadgeSmall days={a.aging_days} />
+                                        </div>
                                     </div>
                                     <div className="text-xs text-gray-400 truncate mb-1" title={a.material_desc}>{a.material_desc}</div>
                                     <div className="flex justify-between text-[10px] text-gray-500">

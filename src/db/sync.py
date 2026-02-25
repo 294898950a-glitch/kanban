@@ -1,7 +1,7 @@
 import json
 from datetime import datetime, timedelta
 from src.db.database import SessionLocal
-from src.db.models import KPIHistory, AlertReportSnapshot, IssueAuditSnapshot, DataQualitySnapshot
+from src.db.models import KPIHistory, AlertReportSnapshot, IssueAuditSnapshot, DataQualitySnapshot, InventoryStatusSnapshot
 from src.analysis.build_report import run as build_report_run
 
 def safe_float(val):
@@ -17,7 +17,7 @@ def safe_str(val):
         return ""
     return str(val)
 
-def save_to_db(alert_rows, issue_rows, quality_stats, session, batch_id):
+def save_to_db(alert_rows, issue_rows, quality_stats, inventory_status_rows, session, batch_id):
     print("\n[DB] 开始将数据写入数据库快照表...")
     ts = datetime.now()
     
@@ -81,6 +81,7 @@ def save_to_db(alert_rows, issue_rows, quality_stats, session, batch_id):
                 last_issue_time=safe_str(r.get("最新发料时间")),
                 is_legacy=1 if r.get("is_legacy") else 0,
                 barcode_list=json.dumps(r.get("barcode_list", []), ensure_ascii=False),
+                reuse_label=safe_str(r.get("reuse_label", "")),
             ))
         session.bulk_save_objects(alert_inserts)
 
@@ -110,6 +111,31 @@ def save_to_db(alert_rows, issue_rows, quality_stats, session, batch_id):
             ))
         session.bulk_save_objects(issue_inserts)
 
+    # 3b. 写入全量库存状态快照（Phase 8）
+    if inventory_status_rows:
+        inv_inserts = []
+        for r in inventory_status_rows:
+            inv_inserts.append(InventoryStatusSnapshot(
+                batch_id=batch_id,
+                timestamp=ts,
+                shop_order=safe_str(r.get("工单号")),
+                material_code=safe_str(r.get("物料编号")),
+                material_desc=safe_str(r.get("物料描述")),
+                warehouse=safe_str(r.get("线边仓")),
+                unit=safe_str(r.get("单位")),
+                actual_inventory=safe_float(r.get("实际库存(合计)")),
+                barcode_count=int(safe_float(r.get("条码数"))),
+                order_status=safe_str(r.get("工单状态")),
+                wo_status_label=safe_str(r.get("wo_status_label")),
+                receive_time=safe_str(r.get("接收时间")),
+                is_legacy=1 if r.get("is_legacy") else 0,
+                barcode_list=json.dumps(r.get("barcode_list", []), ensure_ascii=False),
+                reuse_label=safe_str(r.get("reuse_label")),
+                theory_remain=safe_float(r.get("理论余料")),
+                deviation=safe_float(r.get("偏差(实际-理论)")),
+            ))
+        session.bulk_save_objects(inv_inserts)
+
     # 4. 写入数据质量快照
     from src.db.models import DataQualitySnapshot
     dq = DataQualitySnapshot(
@@ -135,7 +161,7 @@ def save_to_db(alert_rows, issue_rows, quality_stats, session, batch_id):
 def purge_old_batches(session, days: int = 30):
     """删除 N 天前的快照数据，控制 DB 体积"""
     cutoff = datetime.utcnow() - timedelta(days=days)
-    for Model in [AlertReportSnapshot, IssueAuditSnapshot, DataQualitySnapshot, KPIHistory]:
+    for Model in [AlertReportSnapshot, IssueAuditSnapshot, DataQualitySnapshot, KPIHistory, InventoryStatusSnapshot]:
         deleted = session.query(Model).filter(Model.timestamp < cutoff).delete()
         if deleted:
             print(f"  [PURGE] {Model.__tablename__}: 删除 {deleted} 条过期记录")
@@ -144,11 +170,11 @@ def purge_old_batches(session, days: int = 30):
 def run_and_sync():
     """执行生成报告并同步至数据库，同步后清理 30 天前数据"""
     print("[SYNC] 执行原分析逻辑并获取数据...")
-    alert_rows, issue_rows, quality_stats = build_report_run()
+    alert_rows, issue_rows, quality_stats, inventory_status_rows = build_report_run()
     batch_id = datetime.now().strftime("%Y%m%d_%H%M%S")
     db = SessionLocal()
     try:
-        save_to_db(alert_rows, issue_rows, quality_stats, db, batch_id)
+        save_to_db(alert_rows, issue_rows, quality_stats, inventory_status_rows, db, batch_id)
         purge_old_batches(db)
     finally:
         db.close()

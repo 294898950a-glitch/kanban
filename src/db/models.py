@@ -47,10 +47,38 @@ class AlertReportSnapshot(Base):
     last_issue_time = Column(String(50))                  # 最新发料时间(预留原始字符串)
     is_legacy = Column(Integer, default=0)                # 是否为历史遗留数据 (0:否, 1:是)
     barcode_list = Column(Text, default="[]")             # JSON 字符串，存条码列表
+    reuse_label = Column(String(20), default="")          # reuse_current / reuse_upcoming / ""
 
     # 复合索引，加速查询某批次下的特定工单/物料
     __table_args__ = (
         Index('idx_alert_batch_order_mat', 'batch_id', 'shop_order', 'material_code'),
+    )
+
+class InventoryStatusSnapshot(Base):
+    __tablename__ = "inventory_status_snapshots"
+
+    id = Column(Integer, primary_key=True, index=True)
+    batch_id = Column(String(50), index=True, nullable=False)
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+
+    shop_order      = Column(String(50), index=True)
+    material_code   = Column(String(50), index=True)
+    material_desc   = Column(Text)
+    warehouse       = Column(String(100))
+    unit            = Column(String(20))
+    actual_inventory= Column(Float, default=0.0)
+    barcode_count   = Column(Integer, default=0)
+    order_status    = Column(String(50))          # 原始工单状态字段值
+    wo_status_label = Column(String(20), default="")  # current/upcoming/completed/""
+    receive_time    = Column(String(50))
+    is_legacy       = Column(Integer, default=0)
+    barcode_list    = Column(Text, default="[]")
+    reuse_label     = Column(String(20), default="")  # reuse_current/reuse_upcoming/""
+    theory_remain   = Column(Float, default=0.0)      # 仅completed行有意义
+    deviation       = Column(Float, default=0.0)      # 仅completed行有意义
+
+    __table_args__ = (
+        Index('idx_invstatus_batch_order_mat', 'batch_id', 'shop_order', 'material_code'),
     )
 
 class IssueAuditSnapshot(Base):
