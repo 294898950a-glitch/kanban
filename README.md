@@ -1,6 +1,6 @@
 # 墨工厂物料流转审计仪表盘 — 项目交接文档
 
-> **项目阶段**：第六阶段完成（Token 自动刷新 + Docker 化 + 完整部署方案）
+> **项目阶段**：第八阶段完成（线边仓物料用途状态标签）
 > **维护人**：Jay
 > **最后更新**：2026-02-24
 
@@ -642,3 +642,17 @@ A: 执行 `sudo apt install docker-compose-plugin` 安装。
 | DetailPage.tsx | 离场 Tab 加独立 Toggle，进场审计不受影响 | ✅ |
 | scheduler.py | 调度改为 06/10/14/18/22 CST（每天 5 次），06:00 晨间含 BOM 全量 | ✅ |
 | MetricsDoc.tsx | 补充通用物料 Toggle 说明、更新同步频率展示 | ✅ |
+
+### Phase 8（2026-02-25）— 线边仓物料用途状态标签
+
+| 类别 | 内容 | 状态 |
+|------|------|------|
+| src/db/models.py | 新增 InventoryStatusSnapshot 表（全量库存快照）；AlertReportSnapshot 新增 reuse_label 列 | ✅ |
+| tools/migrate_db.py | 幂等迁移：新增 reuse_label 列 + inventory_status_snapshots 表 | ✅ |
+| src/analysis/build_report.py | 新增 build_inventory_status()；提取 _build_reuse_sets / _calc_reuse_label helper；COMPLETED_STATUSES 修正（移除在制状态） | ✅ |
+| src/db/sync.py | 同步全量库存状态至新表；退料预警行写入 reuse_label；purge 覆盖新表 | ✅ |
+| src/api/main.py | 新增 /api/inventory/status 接口（支持 label / exclude_common 过滤）；统一 calculate_aging_days 模块级函数；alerts/top10 + alerts/list 返回 reuse_label | ✅ |
+| frontend/src/components/WoStatusChip.tsx | 新增独立 WoStatusChip 组件（5 种状态彩色 Chip） | ✅ |
+| Dashboard.tsx | 退料预警列表新增「物料状态」列，展示 reuse_label 徽标 | ✅ |
+| DetailPage.tsx | 离场审计 Tab 切换为全量库存数据源；新增 6 类状态筛选 Chip | ✅ |
+| MetricsDoc.tsx | 新增物料用途状态说明（5 种标签含义及操作建议） | ✅ |
