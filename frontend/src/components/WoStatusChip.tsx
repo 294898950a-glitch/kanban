@@ -1,4 +1,4 @@
-export function WoStatusChip({ label, reuse }: { label: string; reuse?: string }) {
+export function WoStatusChip({ label, reuse, isLegacy }: { label: string; reuse?: string; isLegacy?: number }) {
     if (reuse === 'reuse_current') return (
         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium"
             style={{ background: '#14532d55', color: '#4ade80', border: '1px solid #16a34a' }}>
@@ -29,5 +29,17 @@ export function WoStatusChip({ label, reuse }: { label: string; reuse?: string }
             🟠 已完工待退
         </span>
     )
-    return null
+    // 无 IMES 工单匹配的库存（历史遗留或工单范围外）
+    if (isLegacy === 1) return (
+        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium"
+            style={{ background: '#1f2937', color: '#6b7280', border: '1px solid #374151' }}>
+            📦 历史遗留
+        </span>
+    )
+    return (
+        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium"
+            style={{ background: '#1f2937', color: '#9ca3af', border: '1px solid #374151' }}>
+            ❓ 工单外
+        </span>
+    )
 }

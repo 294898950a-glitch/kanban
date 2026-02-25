@@ -125,6 +125,7 @@ export default function DetailPage() {
             if (labelFilter === 'all') return true
             if (labelFilter === 'reuse_current') return r.reuse_label === 'reuse_current'
             if (labelFilter === 'reuse_upcoming') return r.reuse_label === 'reuse_upcoming'
+            if (labelFilter === 'completed') return r.wo_status_label === 'completed' && !r.reuse_label
             return r.wo_status_label === labelFilter
         }).filter(r => {
             if (alertChip === 'all') return true
@@ -323,7 +324,7 @@ function AlertTable({ rows, sort, onSort }: { rows: InventoryStatusRow[]; sort: 
                             <td className="px-4 py-3 truncate max-w-[150px]" title={r.warehouse}>{r.warehouse}</td>
                             <td className="px-4 py-3 font-medium text-blue-400">{r.actual_inventory?.toFixed(2)}</td>
                             <td className="px-4 py-3 text-gray-500">{r.unit || '-'}</td>
-                            <td className="px-4 py-3"><WoStatusChip label={r.wo_status_label} reuse={r.reuse_label} /></td>
+                            <td className="px-4 py-3"><WoStatusChip label={r.wo_status_label} reuse={r.reuse_label} isLegacy={r.is_legacy} /></td>
                             <td className="px-4 py-3"><AgingBadge days={r.aging_days} /></td>
                             <td className="px-4 py-3 min-w-[120px]"><BarcodeCell list={r.barcode_list ?? []} count={r.barcode_count} /></td>
                         </tr>
